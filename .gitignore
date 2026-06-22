@@ -8,3 +8,4 @@ build/
 *.egg-info/
 .pytest_cache/
 memory.json
+*.txt
