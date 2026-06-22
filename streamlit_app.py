@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ load_dotenv()
 
 from mood_playlist_agent.playlist_agent import generate_playlist
 from mood_playlist_agent.memory import save_feedback
+from mood_playlist_agent.models import Track
 
 # ── Page config ─────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -169,23 +171,23 @@ ENERGY_BADGE = {
 }
 
 
-def _track_table_html(tracks) -> str:
+def _track_table_html(tracks: list[Track]) -> str:
     rows = []
     for i, t in enumerate(tracks, 1):
         spotify = (
-            f'<a href="{t.spotify_search_url}" target="_blank" class="track-links spotify-btn">Spotify</a>'
+            f'<a href="{html.escape(t.spotify_search_url)}" target="_blank" class="track-links spotify-btn">Spotify</a>'
             if t.spotify_search_url else ""
         )
         youtube = (
-            f'<a href="{t.youtube_search_url}" target="_blank" class="track-links youtube-btn">YouTube</a>'
+            f'<a href="{html.escape(t.youtube_search_url)}" target="_blank" class="track-links youtube-btn">YouTube</a>'
             if t.youtube_search_url else ""
         )
         rows.append(f"""
         <tr>
           <td class="track-num">{i}</td>
-          <td class="track-title">{t.title}</td>
-          <td class="track-artist">{t.artist}</td>
-          <td class="track-genre">{t.genre}</td>
+          <td class="track-title">{html.escape(t.title)}</td>
+          <td class="track-artist">{html.escape(t.artist)}</td>
+          <td class="track-genre">{html.escape(t.genre)}</td>
           <td class="track-bpm">{t.bpm or "—"}</td>
           <td>{spotify}{youtube}</td>
         </tr>""")
@@ -199,7 +201,7 @@ def _track_table_html(tracks) -> str:
 
 
 def _vibe_tags_html(tags: list[str]) -> str:
-    return "".join(f'<span class="vibe-tag">#{t}</span>' for t in tags)
+    return "".join(f'<span class="vibe-tag">#{html.escape(t)}</span>' for t in tags)
 
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
@@ -288,10 +290,10 @@ if "playlist" in st.session_state:
     st.markdown(f"""
     <div class="playlist-card">
       <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-        <div class="playlist-name">{pl.name}</div>
+        <div class="playlist-name">{html.escape(pl.name)}</div>
         {energy_badge}
       </div>
-      <div class="playlist-summary">{pl.mood_summary}</div>
+      <div class="playlist-summary">{html.escape(pl.mood_summary)}</div>
       <div>{vibe_html}</div>
     </div>
     """, unsafe_allow_html=True)

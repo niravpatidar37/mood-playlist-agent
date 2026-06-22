@@ -1,12 +1,23 @@
 """Simple file-based session memory for learning user preferences."""
 
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 
 
-# Anchored to project root (three levels up from this file: mood_playlist_agent/ → src/ → project root)
-MEMORY_FILE = Path(__file__).resolve().parent.parent.parent / "memory.json"
+def _default_memory_file() -> Path:
+    """Return the memory file path, respecting MOODTUNES_DATA_DIR env var."""
+    custom = os.getenv("MOODTUNES_DATA_DIR")
+    if custom:
+        base = Path(custom)
+    else:
+        base = Path.home() / ".moodtunes"
+    base.mkdir(parents=True, exist_ok=True)
+    return base / "memory.json"
+
+
+MEMORY_FILE = _default_memory_file()
 
 
 def _load() -> dict:

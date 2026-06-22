@@ -2,10 +2,13 @@
 
 import os
 import base64
+import logging
 import time
 from typing import Optional
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 _token_cache: dict = {}
@@ -65,7 +68,7 @@ def enrich_tracks_with_spotify(tracks: list[dict]) -> list[dict]:
             items = resp.json().get("tracks", {}).get("items", [])
             if items:
                 track["spotify_search_url"] = items[0]["external_urls"]["spotify"]
-        except Exception:
-            pass
+        except requests.RequestException as exc:
+            logger.warning("Spotify enrichment failed for '%s': %s", track.get("title"), exc)
         enriched.append(track)
     return enriched

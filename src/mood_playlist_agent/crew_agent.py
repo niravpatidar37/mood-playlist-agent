@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from .models import MoodAnalysis, Playlist
 from .context import build_context_string
 from .memory import get_preference_context, save_session
+from .utils import strip_fences
 
 load_dotenv()
 
@@ -57,13 +58,6 @@ Rules:
 - BPM values must fall within the bpm_range from the mood analysis."""
 
 
-def _strip_fences(raw: str) -> str:
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return raw.strip()
-
 
 def generate_playlist_with_crew(mood_input: str, context_extra: str = "", seed: str = "") -> Playlist:
     """Two-stage pipeline: analyse mood, then curate playlist."""
@@ -80,7 +74,7 @@ def generate_playlist_with_crew(mood_input: str, context_extra: str = "", seed: 
     for attempt in range(3):
         resp = llm.invoke([SystemMessage(content=_MOOD_ANALYST_PROMPT), HumanMessage(content=analyst_user)])
         try:
-            mood_data = json.loads(_strip_fences(resp.content.strip()))
+            mood_data = json.loads(strip_fences(resp.content.strip()))
             mood_analysis = MoodAnalysis(**mood_data)
             break
         except (json.JSONDecodeError, ValidationError) as exc:
@@ -92,7 +86,7 @@ def generate_playlist_with_crew(mood_input: str, context_extra: str = "", seed: 
     for attempt in range(3):
         resp = llm.invoke([SystemMessage(content=_MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_user)])
         try:
-            playlist_data = json.loads(_strip_fences(resp.content.strip()))
+            playlist_data = json.loads(strip_fences(resp.content.strip()))
             playlist = Playlist(**playlist_data)
             break
         except (json.JSONDecodeError, ValidationError) as exc:

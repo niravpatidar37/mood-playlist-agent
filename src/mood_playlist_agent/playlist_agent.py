@@ -11,6 +11,7 @@ from .models import Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
+from .utils import strip_fences
 
 load_dotenv()
 
@@ -94,11 +95,7 @@ def generate_playlist(
     playlist: Playlist | None = None
     for attempt in range(3):
         response = llm.invoke(messages)
-        raw = response.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
+        raw = strip_fences(response.content)
         try:
             data = json.loads(raw)
             playlist = Playlist(**data)
