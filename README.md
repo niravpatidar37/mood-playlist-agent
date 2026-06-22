@@ -40,6 +40,7 @@ $ uv run python main.py --mood "late night lo-fi study session"
 | **Context-aware** | Factors in time of day and live weather |
 | **Session memory** | Learns your genre preferences over time |
 | **Multi-language** | Bollywood, K-pop, Latin, Afrobeats, and more |
+| **Web UI** | Streamlit app with clickable links and per-track feedback |
 | **Single or multi-agent** | LangChain (fast) or CrewAI (deep analysis) |
 | **100% free to run** | Groq free tier — no credit card needed |
 
@@ -79,6 +80,17 @@ $ uv run python main.py --mood "late night lo-fi study session"
         │    Rich Terminal UI   │  energy-colored table + clickable links
         └───────────────────────┘
 ```
+
+---
+
+## 🌐 Web UI (Streamlit)
+
+```bash
+uv run streamlit run streamlit_app.py
+# → opens http://localhost:8501
+```
+
+Features: mood input, seed track anchor, Spotify/YouTube links, per-track feedback (♥ / ✕) to teach MoodTunes your taste over time.
 
 ---
 
@@ -195,7 +207,8 @@ mood-playlist-agent/
 │   ├── __init__.py
 │   ├── test_models.py     # Unit tests (no key needed)
 │   └── test_examples.py   # Live API tests (skipped without key)
-├── main.py                # Root entry point
+├── streamlit_app.py       # Web UI (run with: uv run streamlit run streamlit_app.py)
+├── main.py                # Root entry point (CLI)
 ├── pyproject.toml         # Dependencies + build config (managed by uv)
 ├── uv.lock                # Locked dependency tree
 ├── .env.example           # Environment variable template
