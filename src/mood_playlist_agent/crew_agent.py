@@ -46,9 +46,15 @@ Return ONLY valid JSON — no markdown, no extra text:
     {"title": "string", "artist": "string", "genre": "string", "bpm": 120, "spotify_search_url": "", "youtube_search_url": ""}
   ]
 }
-Rules: exactly 10 tracks, no artist more than twice, support all languages and genres.
-Blend: include 2-3 tracks from the user's "favorites" list if they fit the mood, fill the rest with fresh discoveries.
-Skip any track listed under "recently heard". Let weather and time of day shape the energy and texture."""
+Rules:
+- Exactly 10 tracks, no artist more than twice, support all languages and genres.
+- Quality mix (like Spotify/YouTube algorithm): 2 well-known hits, 3 cult classics or deep cuts, 3 fresh discoveries, 2 wildcard picks from other languages/genres that still fit the vibe.
+- Prioritise user's "loved tracks" — match their energy, genre, and era. Include 1-2 if they fit the mood.
+- Include 1-2 "session favorites" if they fit and aren't recently heard.
+- Skip every track under "recently heard" and "never play again" — no exceptions.
+- Genre diversity: no single genre > 40% of tracks (max 4 out of 10). Actively mix genres.
+- Let weather, season, and day of week shape the energy and texture.
+- BPM values must fall within the bpm_range from the mood analysis."""
 
 
 def _strip_fences(raw: str) -> str:
@@ -59,10 +65,10 @@ def _strip_fences(raw: str) -> str:
     return raw.strip()
 
 
-def generate_playlist_with_crew(mood_input: str, context_extra: str = "") -> Playlist:
+def generate_playlist_with_crew(mood_input: str, context_extra: str = "", seed: str = "") -> Playlist:
     """Two-stage pipeline: analyse mood, then curate playlist."""
     llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7)
-    context = build_context_string(context_extra)
+    context = build_context_string(context_extra, seed=seed)
     preferences = get_preference_context()
 
     # ── Stage 1: Mood Analyst ────────────────────────────────────────────────

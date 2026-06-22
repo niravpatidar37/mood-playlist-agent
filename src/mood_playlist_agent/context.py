@@ -1,4 +1,4 @@
-"""Gathers runtime context: time of day, optional weather."""
+"""Gathers runtime context: time of day, season, weather."""
 
 import os
 from datetime import datetime
@@ -6,16 +6,34 @@ from datetime import datetime
 import requests
 
 
-def get_time_of_day() -> str:
-    hour = datetime.now().hour
-    if 5 <= hour < 12:
-        return "morning"
-    elif 12 <= hour < 17:
-        return "afternoon"
-    elif 17 <= hour < 21:
-        return "evening"
+def get_temporal_context() -> str:
+    now = datetime.now()
+    hour = now.hour
+    day_name = now.strftime("%A")
+
+    month = now.month
+    if month in (12, 1, 2):
+        season = "winter"
+    elif month in (3, 4, 5):
+        season = "spring"
+    elif month in (6, 7, 8):
+        season = "summer"
     else:
-        return "late night"
+        season = "autumn"
+
+    is_weekend = now.weekday() >= 5
+    day_type = "weekend" if is_weekend else "weekday"
+
+    if 5 <= hour < 12:
+        tod = "morning"
+    elif 12 <= hour < 17:
+        tod = "afternoon"
+    elif 17 <= hour < 21:
+        tod = "evening"
+    else:
+        tod = "late night"
+
+    return f"{day_name} {tod} ({day_type}, {season})"
 
 
 def get_weather(city: str | None = None) -> str:
@@ -36,11 +54,13 @@ def get_weather(city: str | None = None) -> str:
         return ""
 
 
-def build_context_string(extra: str = "") -> str:
-    parts = [f"Time of day: {get_time_of_day()}"]
+def build_context_string(extra: str = "", seed: str = "") -> str:
+    parts = [f"Time: {get_temporal_context()}"]
     weather = get_weather()
     if weather:
         parts.append(f"Weather: {weather}")
     if extra:
         parts.append(f"Additional context: {extra}")
+    if seed:
+        parts.append(f"Seed track (use as vibe anchor — match this song's energy, era, and feel): {seed}")
     return "\n".join(parts)
