@@ -1,6 +1,7 @@
 """Unit tests for Pydantic models — no API key needed."""
 
 import pytest
+from pydantic import ValidationError
 from src.mood_playlist_agent.models import Track, Playlist, MoodAnalysis
 
 
@@ -36,6 +37,7 @@ class TestTrack:
             youtube_search_url="https://custom.yt.url",
         )
         assert t.spotify_search_url == "https://custom.spotify.url"
+        assert t.youtube_search_url == "https://custom.yt.url"
 
     def test_bpm_optional(self):
         t = make_track()
@@ -50,8 +52,12 @@ class TestPlaylist:
         assert len(p.tracks) == 10
 
     def test_too_few_tracks_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             make_playlist(n_tracks=3)
+
+    def test_too_many_tracks_raises(self):
+        with pytest.raises(ValidationError):
+            make_playlist(n_tracks=13)
 
     def test_serialise_round_trip(self):
         p = make_playlist()
@@ -62,16 +68,21 @@ class TestPlaylist:
 
 
 class TestContext:
-    def test_time_of_day_returns_string(self):
-        from src.mood_playlist_agent.context import get_time_of_day
-        tod = get_time_of_day()
-        assert tod in {"morning", "afternoon", "evening", "late night"}
+    def test_temporal_context_returns_string(self):
+        from src.mood_playlist_agent.context import get_temporal_context
+        ctx = get_temporal_context()
+        assert any(tod in ctx for tod in {"morning", "afternoon", "evening", "late night"})
 
     def test_build_context_string(self):
         from src.mood_playlist_agent.context import build_context_string
         ctx = build_context_string("studying")
-        assert "Time of day" in ctx
+        assert "Time:" in ctx
         assert "studying" in ctx
+
+    def test_seed_track_in_context(self):
+        from src.mood_playlist_agent.context import build_context_string
+        ctx = build_context_string(seed="Blinding Lights by The Weeknd")
+        assert "Blinding Lights" in ctx
 
 
 class TestMemory:
@@ -82,3 +93,29 @@ class TestMemory:
         mem.save_session("chill vibes", p.model_dump())
         ctx = mem.get_preference_context()
         assert "Pop" in ctx or ctx == "" or "Artist" in ctx
+
+    def test_save_feedback_loved(self, tmp_path, monkeypatch):
+        import src.mood_playlist_agent.memory as mem
+        monkeypatch.setattr(mem, "MEMORY_FILE", tmp_path / "memory.json")
+
+        track = {"title": "Blinding Lights", "artist": "The Weeknd", "genre": "Synth-pop"}
+        mem.save_feedback([track], [])
+
+        import json
+        fb = json.loads(mem.MEMORY_FILE.read_text(encoding="utf-8"))["feedback"]
+        assert "Blinding Lights by The Weeknd" in fb["loved"]
+        assert "Blinding Lights by The Weeknd" not in fb["disliked"]
+        assert fb["loved"]["Blinding Lights by The Weeknd"] == 1
+
+    def test_save_feedback_disliked_removes_loved(self, tmp_path, monkeypatch):
+        import json
+        import src.mood_playlist_agent.memory as mem
+        monkeypatch.setattr(mem, "MEMORY_FILE", tmp_path / "memory.json")
+
+        track = {"title": "Blinding Lights", "artist": "The Weeknd", "genre": "Synth-pop"}
+        mem.save_feedback([track], [])
+        mem.save_feedback([], [track])
+
+        fb = json.loads(mem.MEMORY_FILE.read_text(encoding="utf-8"))["feedback"]
+        assert "Blinding Lights by The Weeknd" not in fb["loved"]
+        assert fb["disliked"]["Blinding Lights by The Weeknd"] == 1

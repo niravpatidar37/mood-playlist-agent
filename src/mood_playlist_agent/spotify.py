@@ -2,6 +2,7 @@
 
 import os
 import base64
+import time
 from typing import Optional
 
 import requests
@@ -14,7 +15,14 @@ def _get_token() -> Optional[str]:
     client_id = os.getenv("SPOTIFY_CLIENT_ID")
     client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
     if not client_id or not client_secret:
+        _token_cache.clear()
         return None
+
+    # Reuse cached token if still valid
+    access_token = _token_cache.get("access_token")
+    expires_at = _token_cache.get("expires_at")
+    if access_token and isinstance(expires_at, (int, float)) and time.time() < expires_at:
+        return access_token
 
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     try:
@@ -25,8 +33,15 @@ def _get_token() -> Optional[str]:
             timeout=10,
         )
         resp.raise_for_status()
-        return resp.json()["access_token"]
-    except Exception:
+        data = resp.json()
+        access_token = data.get("access_token")
+        if not access_token:
+            return None
+        expires_in = int(data.get("expires_in", 3600))
+        _token_cache["access_token"] = access_token
+        _token_cache["expires_at"] = time.time() + max(expires_in - 60, 0)
+        return access_token
+    except requests.RequestException:
         return None
 
 

@@ -27,7 +27,7 @@ class Playlist(BaseModel):
     mood_summary: str = Field(description="2-3 sentence description of the detected mood and why these songs fit")
     vibe_tags: list[str] = Field(description="3-5 short tags like ['chill', 'lo-fi', 'late-night']")
     energy_level: str = Field(description="low / medium / high")
-    tracks: list[Track] = Field(description="Exactly 10 recommended tracks", min_length=8, max_length=12)
+    tracks: list[Track] = Field(description="Exactly 10 recommended tracks", min_length=10, max_length=10)
     genres: list[str] = Field(description="Primary genres featured in this playlist")
 
 

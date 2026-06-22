@@ -5,16 +5,23 @@ from pathlib import Path
 from datetime import datetime
 
 
-MEMORY_FILE = Path("memory.json")
+# Anchored to project root (three levels up from this file: mood_playlist_agent/ → src/ → project root)
+MEMORY_FILE = Path(__file__).resolve().parent.parent.parent / "memory.json"
 
 
 def _load() -> dict:
-    if MEMORY_FILE.exists():
+    if not MEMORY_FILE.exists():
+        return {}
+    try:
+        return json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        backup = MEMORY_FILE.with_suffix(".json.bak")
         try:
-            return json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
+            if not backup.exists():
+                MEMORY_FILE.rename(backup)
+        except OSError:
+            pass
+        return {}
 
 
 def _save(data: dict) -> None:
