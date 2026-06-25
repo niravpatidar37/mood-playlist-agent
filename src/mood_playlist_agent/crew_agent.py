@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 
-from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
@@ -17,8 +16,6 @@ from .models import MoodAnalysis, Playlist
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .utils import strip_fences
-
-load_dotenv()
 
 _MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
 Analyse the user's mood/activity input and return ONLY valid JSON matching this schema — no markdown, no extra text:

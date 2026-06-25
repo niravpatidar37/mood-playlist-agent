@@ -2,7 +2,6 @@
 
 import json
 
-from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import ValidationError
@@ -12,8 +11,6 @@ from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
 from .utils import strip_fences
-
-load_dotenv()
 
 SYSTEM_PROMPT = """You are MoodTunes, an expert music curator AI trained on decades of listening data.
 Your job is to craft a playlist that feels handpicked — like a friend who knows your taste perfectly.

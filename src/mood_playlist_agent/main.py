@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import typer
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.prompt import Prompt
+
+load_dotenv()
 
 from .playlist_agent import generate_playlist
 from .display import print_playlist, collect_feedback
