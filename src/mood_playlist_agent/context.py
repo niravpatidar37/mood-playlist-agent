@@ -1,9 +1,12 @@
 """Gathers runtime context: time of day, season, weather."""
 
+import logging
 import os
 from datetime import datetime
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def get_temporal_context() -> str:
@@ -50,7 +53,8 @@ def get_weather(city: str | None = None) -> str:
         desc = data["weather"][0]["description"]
         temp = data["main"]["temp"]
         return f"{desc}, {temp:.0f}°C in {city}"
-    except Exception:
+    except requests.RequestException as exc:
+        logger.warning("Weather fetch failed for '%s': %s", city, exc)
         return ""
 
 
