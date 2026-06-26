@@ -19,7 +19,7 @@ from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import strip_fences, PLAYLIST_JSON_SCHEMA
+from .utils import strip_fences, PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES
 
 _MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
 Analyse the user's mood/activity input and return ONLY valid JSON matching this schema — no markdown, no extra text:
@@ -35,19 +35,16 @@ Analyse the user's mood/activity input and return ONLY valid JSON matching this 
   "musical_key_feel": "major|minor|modal"
 }"""
 
-_MUSIC_CURATOR_PROMPT = """You are a world-class DJ and music curator with encyclopaedic knowledge of songs across all genres, eras, and languages.
-Given a mood analysis, curate a 10-track playlist.
-Return ONLY valid JSON — no markdown, no extra text:
-""" + PLAYLIST_JSON_SCHEMA + """
-Rules:
-- Exactly 10 tracks, no artist more than twice, support all languages and genres.
-- Quality mix (like Spotify/YouTube algorithm): 2 well-known hits, 3 cult classics or deep cuts, 3 fresh discoveries, 2 wildcard picks from other languages/genres that still fit the vibe.
-- Prioritise user's "loved tracks" — match their energy, genre, and era. Include 1-2 if they fit the mood.
-- Include 1-2 "session favorites" if they fit and aren't recently heard.
-- Skip every track under "recently heard" and "never play again" — no exceptions.
-- Genre diversity: no single genre > 40% of tracks (max 4 out of 10). Actively mix genres.
-- Let weather, season, and day of week shape the energy and texture.
-- BPM values must fall within the bpm_range from the mood analysis."""
+_MUSIC_CURATOR_PROMPT = (
+    "You are a world-class DJ and music curator with encyclopaedic knowledge of songs across all genres, eras, and languages.\n"
+    "Given a mood analysis, curate a 10-track playlist.\n"
+    "Return ONLY valid JSON — no markdown, no extra text:\n"
+    + PLAYLIST_JSON_SCHEMA + "\n"
+    "Rules:\n"
+    + PLAYLIST_CURATOR_RULES + "\n"
+    "- Let weather, season, and day of week shape the energy and texture.\n"
+    "- BPM values must fall within the bpm_range from the mood analysis."
+)
 
 
 
