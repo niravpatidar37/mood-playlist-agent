@@ -5,7 +5,9 @@ from __future__ import annotations
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.text import Text
 
 load_dotenv()
 
@@ -53,7 +55,7 @@ def _generate_and_display(
 
 
 def _interactive_loop(context: str, deep: bool, model: str, spotify: bool, seed: str, ask_feedback: bool) -> None:
-    console.print(Panel_welcome())
+    console.print(_panel_welcome())
     while True:
         mood = Prompt.ask("\n[bold cyan]How are you feeling? (or 'quit' to exit)[/]")
         if mood.lower() in {"quit", "exit", "q"}:
@@ -63,9 +65,7 @@ def _interactive_loop(context: str, deep: bool, model: str, spotify: bool, seed:
             _generate_and_display(mood, context, deep, model, spotify, seed, ask_feedback)
 
 
-def Panel_welcome():
-    from rich.panel import Panel
-    from rich.text import Text
+def _panel_welcome() -> Panel:
     t = Text()
     t.append("  VibeForge\n", style="bold magenta")
     t.append("  AI-powered mood-based playlist generator\n", style="dim")

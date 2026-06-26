@@ -19,7 +19,7 @@ from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import strip_fences
+from .utils import strip_fences, PLAYLIST_JSON_SCHEMA
 
 _MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
 Analyse the user's mood/activity input and return ONLY valid JSON matching this schema — no markdown, no extra text:
@@ -38,16 +38,7 @@ Analyse the user's mood/activity input and return ONLY valid JSON matching this 
 _MUSIC_CURATOR_PROMPT = """You are a world-class DJ and music curator with encyclopaedic knowledge of songs across all genres, eras, and languages.
 Given a mood analysis, curate a 10-track playlist.
 Return ONLY valid JSON — no markdown, no extra text:
-{
-  "name": "string",
-  "mood_summary": "string",
-  "vibe_tags": ["string"],
-  "energy_level": "low|medium|high",
-  "genres": ["string"],
-  "tracks": [
-    {"title": "string", "artist": "string", "genre": "string", "bpm": 120, "spotify_search_url": "", "youtube_search_url": ""}
-  ]
-}
+""" + PLAYLIST_JSON_SCHEMA + """
 Rules:
 - Exactly 10 tracks, no artist more than twice, support all languages and genres.
 - Quality mix (like Spotify/YouTube algorithm): 2 well-known hits, 3 cult classics or deep cuts, 3 fresh discoveries, 2 wildcard picks from other languages/genres that still fit the vibe.

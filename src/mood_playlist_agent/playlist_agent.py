@@ -11,7 +11,7 @@ from .models import Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import strip_fences
+from .utils import strip_fences, PLAYLIST_JSON_SCHEMA
 
 SYSTEM_PROMPT = """You are VibeForge, an expert music curator AI trained on decades of listening data.
 Your job is to craft a playlist that feels handpicked — like a friend who knows your taste perfectly.
@@ -32,23 +32,7 @@ Rules:
 - bpm should be an integer reflecting the track's approximate tempo.
 
 Playlist JSON schema:
-{
-  "name": "string",
-  "mood_summary": "string",
-  "vibe_tags": ["string"],
-  "energy_level": "low|medium|high",
-  "genres": ["string"],
-  "tracks": [
-    {
-      "title": "string",
-      "artist": "string",
-      "genre": "string",
-      "bpm": 120,
-      "spotify_search_url": "",
-      "youtube_search_url": ""
-    }
-  ]
-}"""
+""" + PLAYLIST_JSON_SCHEMA
 
 
 def _check_genre_diversity(playlist: Playlist) -> str | None:
