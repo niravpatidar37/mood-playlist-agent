@@ -21,7 +21,7 @@ def print_playlist(playlist: Playlist) -> None:
     header.append(f"  {playlist.name}\n", style=f"bold {color}")
     header.append(f"  {playlist.mood_summary}\n", style="italic white")
     tags = "  " + "  ".join(f"[{color}]#{t}[/]" for t in playlist.vibe_tags)
-    console.print(Panel(header, title="[bold magenta]MoodTunes[/]", border_style=color))
+    console.print(Panel(header, title="[bold magenta]VibeForge[/]", border_style=color))
     console.print(tags)
     console.print()
 

@@ -1,5 +1,5 @@
 [project]
-name = "mood-playlist-agent"
+name = "vibeforge"
 version = "0.1.0"
 description = "AI agent that generates personalized music playlists based on mood, activity, and context"
 requires-python = ">=3.11"
@@ -22,7 +22,7 @@ crew = [
 ]
 
 [project.scripts]
-mood-playlist = "mood_playlist_agent.main:app"
+vibeforge = "mood_playlist_agent.main:app"
 
 [build-system]
 requires = ["hatchling"]

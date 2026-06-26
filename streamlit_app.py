@@ -1,4 +1,4 @@
-"""Streamlit web UI for MoodTunes — AI mood-based playlist generator."""
+"""Streamlit web UI for VibeForge — AI mood-based playlist generator."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from mood_playlist_agent.models import Track
 
 # ── Page config ─────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="MoodTunes — AI Playlist Generator",
+    page_title="VibeForge — AI Playlist Generator",
     page_icon="🎵",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -25,7 +25,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 /* Header */
-.moodtunes-header {
+.vibeforge-header {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     border: 1px solid #a855f7;
     border-radius: 16px;
@@ -34,7 +34,7 @@ st.markdown("""
     position: relative;
     overflow: hidden;
 }
-.moodtunes-header::before {
+.vibeforge-header::before {
     content: "";
     position: absolute;
     top: -50%;
@@ -44,7 +44,7 @@ st.markdown("""
     background: radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 60%);
     pointer-events: none;
 }
-.moodtunes-title {
+.vibeforge-title {
     font-size: 2.4rem;
     font-weight: 800;
     background: linear-gradient(90deg, #a855f7, #ec4899, #f59e0b);
@@ -54,7 +54,7 @@ st.markdown("""
     margin: 0;
     line-height: 1.2;
 }
-.moodtunes-sub {
+.vibeforge-sub {
     color: #94a3b8;
     font-size: 1rem;
     margin-top: 0.3rem;
@@ -221,7 +221,7 @@ with st.sidebar:
     st.markdown("""
 - Describe your mood in plain English
 - Optionally pin a seed track as a vibe anchor
-- MoodTunes crafts a 10-track playlist using Groq (free)
+- VibeForge crafts a 10-track playlist using Groq (free)
 - Rate tracks to teach it your taste over time
 """)
     st.markdown("---")
@@ -229,9 +229,9 @@ with st.sidebar:
 
 # ── Header ───────────────────────────────────────────────────────────────────
 st.markdown("""
-<div class="moodtunes-header">
-  <div class="moodtunes-title">🎵 MoodTunes</div>
-  <div class="moodtunes-sub">Describe your vibe. Get a hand-curated 10-track playlist in seconds.</div>
+<div class="vibeforge-header">
+  <div class="vibeforge-title">⚡ VibeForge</div>
+  <div class="vibeforge-sub">Your mood. Forged into sound. A hand-curated 10-track playlist in seconds.</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -257,7 +257,7 @@ generate_btn = st.button("✨ Generate Playlist", type="primary", use_container_
 
 # ── Generation ───────────────────────────────────────────────────────────────
 if generate_btn and mood.strip():
-    with st.spinner("MoodTunes is curating your playlist…"):
+    with st.spinner("VibeForge is forging your playlist…"):
         try:
             if use_crew:
                 from mood_playlist_agent.crew_agent import generate_playlist_with_crew
@@ -305,7 +305,7 @@ if "playlist" in st.session_state:
     # ── Feedback ─────────────────────────────────────────────────────────────
     st.markdown("---")
     if not st.session_state.get("feedback_submitted"):
-        st.markdown('<div class="feedback-title">📊 Rate this playlist — teach MoodTunes your taste</div>', unsafe_allow_html=True)
+        st.markdown('<div class="feedback-title">📊 Rate this playlist — teach VibeForge your taste</div>', unsafe_allow_html=True)
 
         track_labels = [f"{i+1}. {t.title} — {t.artist}" for i, t in enumerate(pl.tracks)]
 

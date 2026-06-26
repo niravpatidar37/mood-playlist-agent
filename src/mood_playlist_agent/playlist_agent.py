@@ -12,7 +12,7 @@ from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
 from .utils import strip_fences
 
-SYSTEM_PROMPT = """You are MoodTunes, an expert music curator AI trained on decades of listening data.
+SYSTEM_PROMPT = """You are VibeForge, an expert music curator AI trained on decades of listening data.
 Your job is to craft a playlist that feels handpicked — like a friend who knows your taste perfectly.
 
 Rules:

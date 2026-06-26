@@ -1,6 +1,6 @@
-# 🎵 MoodTunes — AI Mood-Based Playlist Generator
+# ⚡ VibeForge — AI Mood-Based Playlist Generator
 
-> Describe your vibe in plain English. Get a hand-curated 10-track playlist in seconds.
+> Your mood. Forged into sound.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -8,9 +8,9 @@
 [![LLM: Groq](https://img.shields.io/badge/LLM-Groq%20%28free%29-orange)](https://console.groq.com)
 
 ```
-$ uv run python main.py --mood "late night lo-fi study session"
+$ vibeforge --mood "late night lo-fi study session"
 
-╭──────────────────────────── MoodTunes ─────────────────────────────╮
+╭──────────────────────────── VibeForge ─────────────────────────────╮
 │  Late Night Focus                                                   │
 │  Relaxing and concentrated atmosphere for a late night study session│
 ╰─────────────────────────────────────────────────────────────────────╯
@@ -90,7 +90,7 @@ uv run streamlit run streamlit_app.py
 # → opens http://localhost:8501
 ```
 
-Features: mood input, seed track anchor, Spotify/YouTube links, per-track feedback (♥ / ✕) to teach MoodTunes your taste over time.
+Features: mood input, seed track anchor, Spotify/YouTube links, per-track feedback (♥ / ✕) to teach VibeForge your taste over time.
 
 ---
 
@@ -100,8 +100,8 @@ Features: mood input, seed track anchor, Spotify/YouTube links, per-track feedba
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/YOUR_USERNAME/mood-playlist-agent.git
-cd mood-playlist-agent
+git clone https://github.com/YOUR_USERNAME/vibeforge.git
+cd vibeforge
 uv sync
 
 # 2. Add your free Groq API key (console.groq.com — no credit card needed)
@@ -109,7 +109,7 @@ cp .env.example .env
 # Edit .env and set GROQ_API_KEY=gsk_...
 
 # 3. Run
-uv run python main.py --mood "sunny highway road trip, windows down"
+vibeforge --mood "sunny highway road trip, windows down"
 ```
 
 ---
@@ -118,21 +118,21 @@ uv run python main.py --mood "sunny highway road trip, windows down"
 
 ### One-shot mode
 ```bash
-uv run python main.py --mood "rainy day jazz, working from home"
-uv run python main.py --mood "post-workout cool down"
-uv run python main.py --mood "desi wedding vibes"
-uv run python main.py --mood "3am can't sleep, anxious thoughts"
+vibeforge --mood "rainy day jazz, working from home"
+vibeforge --mood "post-workout cool down"
+vibeforge --mood "desi wedding vibes"
+vibeforge --mood "3am can't sleep, anxious thoughts"
 ```
 
 ### Interactive loop
 ```bash
-uv run python main.py
+vibeforge
 # → prompts you for mood on each loop, type 'quit' to exit
 ```
 
 ### Multi-agent mode (CrewAI)
 ```bash
-uv run python main.py --mood "heartbreak, raining outside" --crew
+vibeforge --mood "heartbreak, raining outside" --crew
 ```
 
 ### All options
@@ -140,9 +140,11 @@ uv run python main.py --mood "heartbreak, raining outside" --crew
 Options:
   --mood    -m   TEXT   Mood/activity description (skips prompt)
   --context -c   TEXT   Extra context e.g. 'rainy day, studying'
+  --seed    -s   TEXT   Seed track as vibe anchor e.g. 'Blinding Lights by The Weeknd'
   --crew         FLAG   Use multi-agent CrewAI mode
   --model        TEXT   LLM model override  [default: llama-3.3-70b-versatile]
   --no-spotify   FLAG   Skip Spotify link enrichment
+  --no-feedback  FLAG   Skip post-playlist feedback prompt
 ```
 
 ---
@@ -192,7 +194,7 @@ uv run pytest tests/ -v
 ## 📁 Project Structure
 
 ```
-mood-playlist-agent/
+vibeforge/
 ├── src/mood_playlist_agent/
 │   ├── __init__.py
 │   ├── main.py            # CLI (Typer) — interactive + --mood flag
@@ -202,6 +204,7 @@ mood-playlist-agent/
 │   ├── context.py         # Time-of-day + live weather
 │   ├── memory.py          # Session preference learning (favorites + freshness)
 │   ├── spotify.py         # Optional Spotify API enrichment
+│   ├── utils.py           # Shared helpers (strip_fences)
 │   └── display.py         # Rich terminal UI
 ├── tests/
 │   ├── __init__.py

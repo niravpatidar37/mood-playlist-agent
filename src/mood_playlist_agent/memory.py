@@ -7,12 +7,12 @@ from datetime import datetime
 
 
 def _default_memory_file() -> Path:
-    """Return the memory file path, respecting MOODTUNES_DATA_DIR env var."""
-    custom = os.getenv("MOODTUNES_DATA_DIR")
+    """Return the memory file path, respecting VIBEFORGE_DATA_DIR env var."""
+    custom = os.getenv("VIBEFORGE_DATA_DIR")
     if custom:
         base = Path(custom)
     else:
-        base = Path.home() / ".moodtunes"
+        base = Path.home() / ".vibeforge"
     base.mkdir(parents=True, exist_ok=True)
     return base / "memory.json"
 

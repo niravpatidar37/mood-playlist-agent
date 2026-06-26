@@ -13,7 +13,7 @@ from .playlist_agent import generate_playlist
 from .display import print_playlist, collect_feedback
 from .memory import save_feedback
 
-app = typer.Typer(help="MoodTunes — AI-powered mood-based playlist generator")
+app = typer.Typer(help="VibeForge — AI-powered mood-based playlist generator")
 console = Console()
 
 
@@ -38,7 +38,7 @@ def _generate_and_display(
     mood: str, context: str, crew: bool, model: str, spotify: bool, seed: str, ask_feedback: bool
 ) -> None:
     console.print(f"\n[bold magenta]Generating playlist for:[/] [cyan]{mood}[/]\n")
-    with console.status("[bold magenta]MoodTunes is curating your playlist...[/]"):
+    with console.status("[bold magenta]VibeForge is forging your playlist...[/]"):
         if crew:
             from .crew_agent import generate_playlist_with_crew
             playlist = generate_playlist_with_crew(mood, context, seed=seed)
@@ -67,7 +67,7 @@ def Panel_welcome():
     from rich.panel import Panel
     from rich.text import Text
     t = Text()
-    t.append("  MoodTunes\n", style="bold magenta")
+    t.append("  VibeForge\n", style="bold magenta")
     t.append("  AI-powered mood-based playlist generator\n", style="dim")
     t.append("  Describe your mood or activity and get a personalised playlist.\n", style="italic")
     return Panel(t, border_style="magenta")

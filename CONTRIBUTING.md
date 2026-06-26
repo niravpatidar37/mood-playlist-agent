@@ -1,4 +1,4 @@
-# Contributing to MoodTunes
+# Contributing to VibeForge
 
 Thanks for taking the time to contribute! Here's everything you need to know.
 
