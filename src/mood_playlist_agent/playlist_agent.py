@@ -1,6 +1,7 @@
 """Single LangChain agent that generates a mood-based playlist."""
 
 import json
+from functools import lru_cache
 
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -64,6 +65,11 @@ def _check_genre_diversity(playlist: Playlist) -> str | None:
     return None
 
 
+@lru_cache(maxsize=8)
+def _get_llm(model: str) -> ChatGroq:
+    return ChatGroq(model=model, temperature=0.8)
+
+
 def generate_playlist(
     mood_input: str,
     context_extra: str = "",
@@ -72,7 +78,7 @@ def generate_playlist(
     seed: str = "",
 ) -> Playlist:
     """Generate a Playlist from a natural-language mood description."""
-    llm = ChatGroq(model=model, temperature=0.8)
+    llm = _get_llm(model)
 
     context = build_context_string(context_extra, seed=seed)
     preferences = get_preference_context()

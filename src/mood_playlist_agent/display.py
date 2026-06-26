@@ -83,6 +83,7 @@ def collect_feedback(playlist: Playlist) -> tuple[list[dict], list[dict]]:
     )
     console.print()
 
-    loved = [tracks[i].model_dump() for i in _parse_numbers(loved_raw, n)]
-    disliked = [tracks[i].model_dump() for i in _parse_numbers(disliked_raw, n) if i not in _parse_numbers(loved_raw, n)]
+    loved_idxs = set(_parse_numbers(loved_raw, n))
+    loved = [tracks[i].model_dump() for i in loved_idxs]
+    disliked = [tracks[i].model_dump() for i in _parse_numbers(disliked_raw, n) if i not in loved_idxs]
     return loved, disliked

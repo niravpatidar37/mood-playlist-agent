@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 
+from functools import lru_cache
+
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
@@ -56,9 +58,14 @@ Rules:
 
 
 
+@lru_cache(maxsize=4)
+def _get_llm(model: str, temperature: float) -> ChatGroq:
+    return ChatGroq(model=model, temperature=temperature)
+
+
 def generate_playlist_with_crew(mood_input: str, context_extra: str = "", seed: str = "") -> Playlist:
     """Two-stage pipeline: analyse mood, then curate playlist."""
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7)
+    llm = _get_llm("llama-3.3-70b-versatile", 0.7)
     context = build_context_string(context_extra, seed=seed)
     preferences = get_preference_context()
 

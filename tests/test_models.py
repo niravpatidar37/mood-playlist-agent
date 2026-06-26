@@ -87,35 +87,35 @@ class TestContext:
 
 class TestMemory:
     def test_save_and_load(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("VIBEFORGE_DATA_DIR", str(tmp_path))
         import src.mood_playlist_agent.memory as mem
-        monkeypatch.setattr(mem, "MEMORY_FILE", tmp_path / "memory.json")
         p = make_playlist()
         mem.save_session("chill vibes", p.model_dump())
         ctx = mem.get_preference_context()
         assert "Pop" in ctx or ctx == "" or "Artist" in ctx
 
     def test_save_feedback_loved(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("VIBEFORGE_DATA_DIR", str(tmp_path))
         import src.mood_playlist_agent.memory as mem
-        monkeypatch.setattr(mem, "MEMORY_FILE", tmp_path / "memory.json")
 
         track = {"title": "Blinding Lights", "artist": "The Weeknd", "genre": "Synth-pop"}
         mem.save_feedback([track], [])
 
         import json
-        fb = json.loads(mem.MEMORY_FILE.read_text(encoding="utf-8"))["feedback"]
+        fb = json.loads((tmp_path / "memory.json").read_text(encoding="utf-8"))["feedback"]
         assert "Blinding Lights by The Weeknd" in fb["loved"]
         assert "Blinding Lights by The Weeknd" not in fb["disliked"]
         assert fb["loved"]["Blinding Lights by The Weeknd"] == 1
 
     def test_save_feedback_disliked_removes_loved(self, tmp_path, monkeypatch):
         import json
+        monkeypatch.setenv("VIBEFORGE_DATA_DIR", str(tmp_path))
         import src.mood_playlist_agent.memory as mem
-        monkeypatch.setattr(mem, "MEMORY_FILE", tmp_path / "memory.json")
 
         track = {"title": "Blinding Lights", "artist": "The Weeknd", "genre": "Synth-pop"}
         mem.save_feedback([track], [])
         mem.save_feedback([], [track])
 
-        fb = json.loads(mem.MEMORY_FILE.read_text(encoding="utf-8"))["feedback"]
+        fb = json.loads((tmp_path / "memory.json").read_text(encoding="utf-8"))["feedback"]
         assert "Blinding Lights by The Weeknd" not in fb["loved"]
         assert fb["disliked"]["Blinding Lights by The Weeknd"] == 1

@@ -6,37 +6,32 @@ from pathlib import Path
 from datetime import datetime
 
 
-def _default_memory_file() -> Path:
-    """Return the memory file path, respecting VIBEFORGE_DATA_DIR env var."""
+def _memory_file() -> Path:
+    """Resolve the memory file path on each call so VIBEFORGE_DATA_DIR overrides work at any time."""
     custom = os.getenv("VIBEFORGE_DATA_DIR")
-    if custom:
-        base = Path(custom)
-    else:
-        base = Path.home() / ".vibeforge"
+    base = Path(custom) if custom else Path.home() / ".vibeforge"
     base.mkdir(parents=True, exist_ok=True)
     return base / "memory.json"
 
 
-MEMORY_FILE = _default_memory_file()
-
-
 def _load() -> dict:
-    if not MEMORY_FILE.exists():
+    path = _memory_file()
+    if not path.exists():
         return {}
     try:
-        return json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        backup = MEMORY_FILE.with_suffix(".json.bak")
+        backup = path.with_suffix(".json.bak")
         try:
             if not backup.exists():
-                MEMORY_FILE.rename(backup)
+                path.rename(backup)
         except OSError:
             pass
         return {}
 
 
 def _save(data: dict) -> None:
-    MEMORY_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    _memory_file().write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def get_preference_context() -> str:
