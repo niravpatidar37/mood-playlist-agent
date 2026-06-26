@@ -2,6 +2,13 @@
 
 import re
 
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
+AVAILABLE_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "mixtral-8x7b-32768",
+]
+
 PLAYLIST_CURATOR_RULES = """\
 - Exactly 10 tracks that genuinely fit the mood.
 - Quality mix (like Spotify/YouTube algorithm): 2 well-known hits the user probably loves, 3 cult classics or critically acclaimed deep cuts, 3 fresh discoveries the user likely hasn't heard, 2 wildcard picks from other languages or genres that still fit the vibe.
@@ -32,9 +39,13 @@ PLAYLIST_JSON_SCHEMA = """{
 
 
 def strip_fences(raw: str) -> str:
-    """Extract JSON from a markdown code fence, handling optional language tags and extra content."""
+    """Extract JSON from LLM output — handles fenced blocks and bare unfenced JSON."""
     raw = raw.strip()
-    match = re.search(r"```(?:\w+)?\n?(.*?)```", raw, re.DOTALL)
+    match = re.search(r"```[^\n]*\n(.*?)```", raw, re.DOTALL)
     if match:
         return match.group(1).strip()
+    # Fallback: extract the outermost {...} block when the model skips fences
+    start, end = raw.find("{"), raw.rfind("}")
+    if start != -1 and end > start:
+        return raw[start:end + 1]
     return raw

@@ -12,6 +12,7 @@ load_dotenv()
 from mood_playlist_agent.playlist_agent import generate_playlist
 from mood_playlist_agent.memory import save_feedback
 from mood_playlist_agent.models import Track
+from mood_playlist_agent.utils import AVAILABLE_MODELS
 
 # ── Page config ─────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -206,7 +207,7 @@ with st.sidebar:
     st.markdown("### ⚙️ Options")
     model = st.selectbox(
         "LLM Model",
-        ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
+        AVAILABLE_MODELS,
         index=0,
     )
     context_extra = st.text_input(

@@ -14,6 +14,7 @@ load_dotenv()
 from .playlist_agent import generate_playlist
 from .display import print_playlist, collect_feedback
 from .memory import save_feedback
+from .utils import DEFAULT_MODEL
 
 app = typer.Typer(help="VibeForge — AI-powered mood-based playlist generator")
 console = Console()
@@ -24,7 +25,7 @@ def run(
     mood: str = typer.Option(None, "--mood", "-m", help="Mood/activity description (skips interactive prompt)"),
     context: str = typer.Option("", "--context", "-c", help="Extra context, e.g. 'rainy day, studying'"),
     deep: bool = typer.Option(False, "--deep", help="Use two-stage analysis (Mood Analyst → Music Curator)"),
-    model: str = typer.Option("llama-3.3-70b-versatile", "--model", help="Groq model to use"),
+    model: str = typer.Option(DEFAULT_MODEL, "--model", help="Groq model to use"),
     no_spotify: bool = typer.Option(False, "--no-spotify", help="Skip Spotify enrichment"),
     seed: str = typer.Option("", "--seed", "-s", help="Seed track as vibe anchor, e.g. 'Blinding Lights by The Weeknd'"),
     no_feedback: bool = typer.Option(False, "--no-feedback", help="Skip the post-playlist feedback prompt"),

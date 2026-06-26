@@ -19,7 +19,7 @@ from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import strip_fences, PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES
+from .utils import strip_fences, PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL
 
 _MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
 Analyse the user's mood/activity input and return ONLY valid JSON matching this schema — no markdown, no extra text:
@@ -57,7 +57,7 @@ def generate_playlist_with_crew(
     mood_input: str,
     context_extra: str = "",
     seed: str = "",
-    model: str = "llama-3.3-70b-versatile",
+    model: str = DEFAULT_MODEL,
     spotify_enrich: bool = True,
 ) -> Playlist:
     """Two-stage pipeline: analyse mood, then curate playlist."""

@@ -9,6 +9,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def isolated_memory(tmp_path, monkeypatch):
+    """Redirect session memory to a temp dir so tests never touch ~/.vibeforge."""
+    monkeypatch.setenv("VIBEFORGE_DATA_DIR", str(tmp_path))
+
+
 def test_generate_playlist_chill():
     from mood_playlist_agent.playlist_agent import generate_playlist
     playlist = generate_playlist("feeling chill after a long day", spotify_enrich=False)
