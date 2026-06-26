@@ -1,6 +1,6 @@
 """Pydantic models for the playlist agent."""
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from urllib.parse import quote_plus
 
 from pydantic import BaseModel, Field
@@ -26,19 +26,19 @@ class Playlist(BaseModel):
     name: str = Field(description="Creative playlist name reflecting the mood")
     mood_summary: str = Field(description="2-3 sentence description of the detected mood and why these songs fit")
     vibe_tags: list[str] = Field(description="3-5 short tags like ['chill', 'lo-fi', 'late-night']")
-    energy_level: str = Field(description="low / medium / high")
+    energy_level: Literal["low", "medium", "high"]
     tracks: list[Track] = Field(description="Exactly 10 recommended tracks", min_length=10, max_length=10)
     genres: list[str] = Field(description="Primary genres featured in this playlist")
 
 
 class MoodAnalysis(BaseModel):
-    """Intermediate model used by the CrewAI mood analyst agent."""
+    """Intermediate model used by the two-stage analysis pipeline."""
     primary_emotion: str
     secondary_emotions: list[str]
-    energy_level: str  # low / medium / high
-    bpm_range: str     # e.g. "60-80"
+    energy_level: Literal["low", "medium", "high"]
+    bpm_range: str
     recommended_genres: list[str]
     avoid_genres: list[str]
     time_of_day_context: str
     activity_context: str
-    musical_key_feel: str  # major / minor / modal
+    musical_key_feel: Literal["major", "minor", "modal"]
