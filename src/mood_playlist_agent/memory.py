@@ -1,9 +1,12 @@
 """Simple file-based session memory for learning user preferences."""
 
 import json
+import logging
 import os
 from pathlib import Path
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 def _memory_file() -> Path:
@@ -23,10 +26,11 @@ def _load() -> dict:
     except (json.JSONDecodeError, OSError):
         backup = path.with_suffix(".json.bak")
         try:
-            if not backup.exists():
-                path.rename(backup)
-        except OSError:
-            pass
+            backup.unlink(missing_ok=True)  # always replace stale backup
+            path.rename(backup)
+            logger.warning("Corrupt memory file backed up to %s", backup)
+        except OSError as exc:
+            logger.warning("Could not back up corrupt memory file %s: %s", path, exc)
         return {}
 
 

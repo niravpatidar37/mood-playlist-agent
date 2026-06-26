@@ -213,7 +213,7 @@ with st.sidebar:
         "Extra context",
         placeholder="e.g. studying, gym, road trip…",
     )
-    use_crew = st.toggle("Multi-agent mode (--crew)", value=False)
+    use_deep = st.toggle("Two-stage analysis (--deep)", value=False)
     skip_spotify = st.toggle("Skip Spotify enrichment", value=False)
 
     st.markdown("---")
@@ -259,9 +259,11 @@ generate_btn = st.button("✨ Generate Playlist", type="primary", use_container_
 if generate_btn and mood.strip():
     with st.spinner("VibeForge is forging your playlist…"):
         try:
-            if use_crew:
+            if use_deep:
                 from mood_playlist_agent.crew_agent import generate_playlist_with_crew
-                playlist = generate_playlist_with_crew(mood, context_extra, seed=seed)
+                playlist = generate_playlist_with_crew(
+                    mood, context_extra, seed=seed, model=model, spotify_enrich=not skip_spotify
+                )
             else:
                 playlist = generate_playlist(
                     mood, context_extra,

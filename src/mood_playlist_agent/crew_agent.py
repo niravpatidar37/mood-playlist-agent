@@ -1,7 +1,8 @@
-"""Two-stage multi-agent pipeline: Mood Analyst → Music Curator.
+"""Two-stage analysis pipeline: Mood Analyst → Music Curator.
 
-Implements the same conceptual flow as CrewAI but via two sequential
-LangChain calls, avoiding crewai/litellm dependency issues with Groq.
+Two sequential LangChain calls: a specialist mood analyst first extracts
+emotional context, then a music curator uses that analysis to build
+a more precisely targeted playlist.
 """
 
 from __future__ import annotations
@@ -14,9 +15,10 @@ from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
 
-from .models import MoodAnalysis, Playlist
+from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
+from .spotify import enrich_tracks_with_spotify
 from .utils import strip_fences
 
 _MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
@@ -63,9 +65,15 @@ def _get_llm(model: str, temperature: float) -> ChatGroq:
     return ChatGroq(model=model, temperature=temperature)
 
 
-def generate_playlist_with_crew(mood_input: str, context_extra: str = "", seed: str = "") -> Playlist:
+def generate_playlist_with_crew(
+    mood_input: str,
+    context_extra: str = "",
+    seed: str = "",
+    model: str = "llama-3.3-70b-versatile",
+    spotify_enrich: bool = True,
+) -> Playlist:
     """Two-stage pipeline: analyse mood, then curate playlist."""
-    llm = _get_llm("llama-3.3-70b-versatile", 0.7)
+    llm = _get_llm(model, 0.7)
     context = build_context_string(context_extra, seed=seed)
     preferences = get_preference_context()
 
@@ -96,6 +104,10 @@ def generate_playlist_with_crew(mood_input: str, context_extra: str = "", seed: 
         except (json.JSONDecodeError, ValidationError) as exc:
             if attempt == 2:
                 raise RuntimeError(f"Music Curator returned invalid JSON after 3 attempts: {exc}") from exc
+
+    if spotify_enrich:
+        enriched = enrich_tracks_with_spotify([t.model_dump() for t in playlist.tracks])
+        playlist.tracks = [Track(**t) for t in enriched]
 
     save_session(mood_input, playlist.model_dump())
     return playlist

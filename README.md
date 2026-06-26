@@ -41,7 +41,7 @@ $ vibeforge --mood "late night lo-fi study session"
 | **Session memory** | Learns your genre preferences over time |
 | **Multi-language** | Bollywood, K-pop, Latin, Afrobeats, and more |
 | **Web UI** | Streamlit app with clickable links and per-track feedback |
-| **Single or multi-agent** | LangChain (fast) or CrewAI (deep analysis) |
+| **Single or multi-agent** | LangChain (fast) or two-stage (deep analysis) |
 | **100% free to run** | Groq free tier — no credit card needed |
 
 ---
@@ -69,7 +69,7 @@ $ vibeforge --mood "late night lo-fi study session"
         └───────────┬────────────────────────────────┘
                     │  optional
         ┌───────────▼───────────┐
-        │  CrewAI (--crew flag) │  Mood Analyst → Music Curator
+        │  two-stage (--deep flag) │  Mood Analyst → Music Curator
         └───────────┬───────────┘
                     │  optional
         ┌───────────▼───────────┐
@@ -130,9 +130,9 @@ vibeforge
 # → prompts you for mood on each loop, type 'quit' to exit
 ```
 
-### Multi-agent mode (CrewAI)
+### Multi-agent mode (two-stage)
 ```bash
-vibeforge --mood "heartbreak, raining outside" --crew
+vibeforge --mood "heartbreak, raining outside" --deep
 ```
 
 ### All options
@@ -141,7 +141,7 @@ Options:
   --mood    -m   TEXT   Mood/activity description (skips prompt)
   --context -c   TEXT   Extra context e.g. 'rainy day, studying'
   --seed    -s   TEXT   Seed track as vibe anchor e.g. 'Blinding Lights by The Weeknd'
-  --crew         FLAG   Use multi-agent CrewAI mode
+  --deep         FLAG   Use multi-agent two-stage mode
   --model        TEXT   LLM model override  [default: llama-3.3-70b-versatile]
   --no-spotify   FLAG   Skip Spotify link enrichment
   --no-feedback  FLAG   Skip post-playlist feedback prompt
@@ -199,7 +199,7 @@ vibeforge/
 │   ├── __init__.py
 │   ├── main.py            # CLI (Typer) — interactive + --mood flag
 │   ├── playlist_agent.py  # LangChain single-agent
-│   ├── crew_agent.py      # Two-stage multi-agent pipeline (--crew)
+│   ├── crew_agent.py      # Two-stage multi-agent pipeline (--deep)
 │   ├── models.py          # Pydantic Track + Playlist schemas
 │   ├── context.py         # Time-of-day + live weather
 │   ├── memory.py          # Session preference learning (favorites + freshness)

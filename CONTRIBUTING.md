@@ -7,8 +7,8 @@ Thanks for taking the time to contribute! Here's everything you need to know.
 ## Getting Started
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mood-playlist-agent.git
-cd mood-playlist-agent
+git clone https://github.com/YOUR_USERNAME/vibeforge.git
+cd vibeforge
 uv sync
 cp .env.example .env   # add your GROQ_API_KEY
 ```
