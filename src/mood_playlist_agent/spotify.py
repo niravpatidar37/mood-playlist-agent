@@ -44,7 +44,8 @@ def _get_token() -> Optional[str]:
         _token_cache["access_token"] = access_token
         _token_cache["expires_at"] = time.time() + max(expires_in - 60, 0)
         return access_token
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        logger.warning("Spotify token request failed: %s", exc)
         return None
 
 
