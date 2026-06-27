@@ -69,4 +69,4 @@ Please include:
 
 ## License
 
-By contributing you agree your code will be released under the [MIT License](LICENSE).
+By contributing, you agree your code will be released under the [MIT License](LICENSE).

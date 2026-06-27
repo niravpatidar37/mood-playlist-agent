@@ -8,6 +8,8 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+MAX_FEEDBACK_ENTRIES = 200
+
 
 def _memory_file() -> Path:
     """Resolve the memory file path on each call so VIBEFORGE_DATA_DIR overrides work at any time."""
@@ -132,6 +134,11 @@ def save_feedback(loved: list[dict], disliked: list[dict]) -> None:
         key = f"{t['title']} by {t['artist']}"
         fb["disliked"][key] = fb["disliked"].get(key, 0) + 1
         fb["loved"].pop(key, None)  # un-love if previously marked
+    for bucket in ("loved", "disliked"):
+        if len(fb[bucket]) > MAX_FEEDBACK_ENTRIES:
+            fb[bucket] = dict(
+                sorted(fb[bucket].items(), key=lambda kv: kv[1], reverse=True)[:MAX_FEEDBACK_ENTRIES]
+            )
     _save(data)
 
 
