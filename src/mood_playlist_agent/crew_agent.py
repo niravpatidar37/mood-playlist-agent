@@ -9,9 +9,6 @@ from __future__ import annotations
 
 import json
 
-from functools import lru_cache
-
-from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
 
@@ -19,7 +16,7 @@ from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import strip_fences, PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL
+from .utils import strip_fences, PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL, get_cached_llm
 
 _MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
 Analyse the user's mood/activity input and return ONLY valid JSON matching this schema — no markdown, no extra text:
@@ -48,11 +45,6 @@ _MUSIC_CURATOR_PROMPT = (
 
 
 
-@lru_cache(maxsize=4)
-def _get_llm(model: str, temperature: float) -> ChatGroq:
-    return ChatGroq(model=model, temperature=temperature)
-
-
 def generate_playlist_with_crew(
     mood_input: str,
     context_extra: str = "",
@@ -61,7 +53,7 @@ def generate_playlist_with_crew(
     spotify_enrich: bool = True,
 ) -> Playlist:
     """Two-stage pipeline: analyse mood, then curate playlist."""
-    llm = _get_llm(model, 0.7)
+    llm = get_cached_llm(model, 0.7)
     context = build_context_string(context_extra, seed=seed)
     preferences = get_preference_context()
 
@@ -74,7 +66,7 @@ def generate_playlist_with_crew(
     for attempt in range(3):
         resp = llm.invoke([SystemMessage(content=_MOOD_ANALYST_PROMPT), HumanMessage(content=analyst_user)])
         try:
-            mood_data = json.loads(strip_fences(resp.content.strip()))
+            mood_data = json.loads(strip_fences(str(resp.content).strip()))
             mood_analysis = MoodAnalysis(**mood_data)
             break
         except (json.JSONDecodeError, ValidationError) as exc:
@@ -86,7 +78,7 @@ def generate_playlist_with_crew(
     for attempt in range(3):
         resp = llm.invoke([SystemMessage(content=_MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_user)])
         try:
-            playlist_data = json.loads(strip_fences(resp.content.strip()))
+            playlist_data = json.loads(strip_fences(str(resp.content).strip()))
             playlist = Playlist(**playlist_data)
             break
         except (json.JSONDecodeError, ValidationError) as exc:

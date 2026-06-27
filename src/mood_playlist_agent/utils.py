@@ -1,6 +1,13 @@
 """Shared utilities used across agents."""
 
+from __future__ import annotations
+
 import re
+from functools import lru_cache
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from langchain_groq import ChatGroq
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 AVAILABLE_MODELS = [
@@ -36,6 +43,13 @@ PLAYLIST_JSON_SCHEMA = """{
     }
   ]
 }"""
+
+
+@lru_cache(maxsize=16)
+def get_cached_llm(model: str, temperature: float = 0.8) -> ChatGroq:
+    """Return a cached ChatGroq client; shared across both pipeline modes."""
+    from langchain_groq import ChatGroq
+    return ChatGroq(model=model, temperature=temperature)
 
 
 def strip_fences(raw: str) -> str:

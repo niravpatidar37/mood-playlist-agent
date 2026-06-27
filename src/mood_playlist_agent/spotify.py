@@ -4,6 +4,7 @@ import os
 import base64
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
 import requests
@@ -49,27 +50,34 @@ def _get_token() -> Optional[str]:
         return None
 
 
+def _enrich_one(track: dict, token: str) -> dict:
+    """Fetch a real Spotify URL for a single track; returns the track unchanged on failure."""
+    query = f"track:{track.get('title', '')} artist:{track.get('artist', '')}"
+    try:
+        resp = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"q": query, "type": "track", "limit": 1},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        items = resp.json().get("tracks", {}).get("items", [])
+        if items:
+            track["spotify_search_url"] = items[0]["external_urls"]["spotify"]
+    except requests.RequestException as exc:
+        logger.warning("Spotify enrichment failed for '%s': %s", track.get("title"), exc)
+    return track
+
+
 def enrich_tracks_with_spotify(tracks: list[dict]) -> list[dict]:
     """Try to add real Spotify track URLs. Falls back to search URLs if API unavailable."""
     token = _get_token()
     if not token:
         return tracks  # search URLs already set in Track.model_post_init
 
-    enriched = []
-    for track in tracks:
-        query = f"track:{track['title']} artist:{track['artist']}"
-        try:
-            resp = requests.get(
-                "https://api.spotify.com/v1/search",
-                headers={"Authorization": f"Bearer {token}"},
-                params={"q": query, "type": "track", "limit": 1},
-                timeout=8,
-            )
-            resp.raise_for_status()
-            items = resp.json().get("tracks", {}).get("items", [])
-            if items:
-                track["spotify_search_url"] = items[0]["external_urls"]["spotify"]
-        except requests.RequestException as exc:
-            logger.warning("Spotify enrichment failed for '%s': %s", track.get("title"), exc)
-        enriched.append(track)
-    return enriched
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(_enrich_one, track, token): i for i, track in enumerate(tracks)}
+        result: list[dict] = [{}] * len(tracks)
+        for future in as_completed(futures):
+            result[futures[future]] = future.result()
+    return result
