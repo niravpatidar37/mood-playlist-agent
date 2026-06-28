@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import re
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
+
+from pydantic import BaseModel, ValidationError
 
 if TYPE_CHECKING:
     from langchain_groq import ChatGroq
+
+_M = TypeVar("_M", bound=BaseModel)
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 AVAILABLE_MODELS = [
@@ -50,6 +55,22 @@ def get_cached_llm(model: str, temperature: float = 0.8) -> ChatGroq:
     """Return a cached ChatGroq client; shared across both pipeline modes."""
     from langchain_groq import ChatGroq
     return ChatGroq(model=model, temperature=temperature)
+
+
+def invoke_with_retry(llm: ChatGroq, messages: list, model_class: type[_M], label: str, max_attempts: int = 3) -> _M:
+    """Invoke LLM, extract JSON from the response, validate with Pydantic — retry on failure."""
+    from langchain_core.messages import HumanMessage
+
+    for attempt in range(max_attempts):
+        resp = llm.invoke(messages)
+        raw = strip_fences(str(resp.content))
+        try:
+            return model_class(**json.loads(raw))
+        except (json.JSONDecodeError, ValidationError) as exc:
+            if attempt == max_attempts - 1:
+                raise RuntimeError(f"{label} returned invalid JSON after {max_attempts} attempts: {exc}") from exc
+            messages = [*messages, HumanMessage(content=f"Your response had errors: {exc}. Return valid JSON only.")]
+    raise AssertionError("unreachable")
 
 
 def strip_fences(raw: str) -> str:

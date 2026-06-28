@@ -7,16 +7,13 @@ a more precisely targeted playlist.
 
 from __future__ import annotations
 
-import json
-
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import ValidationError
 
 from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import strip_fences, PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL, get_cached_llm
+from .utils import PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL, get_cached_llm, invoke_with_retry
 
 _MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
 Analyse the user's mood/activity input and return ONLY valid JSON matching this schema — no markdown, no extra text:
@@ -63,27 +60,21 @@ def generate_playlist_with_crew(
         f"Context:\n{context}",
         f"Memory context (follow strictly):\n{preferences}" if preferences else "",
     ]))
-    for attempt in range(3):
-        resp = llm.invoke([SystemMessage(content=_MOOD_ANALYST_PROMPT), HumanMessage(content=analyst_user)])
-        try:
-            mood_data = json.loads(strip_fences(str(resp.content).strip()))
-            mood_analysis = MoodAnalysis(**mood_data)
-            break
-        except (json.JSONDecodeError, ValidationError) as exc:
-            if attempt == 2:
-                raise RuntimeError(f"Mood Analyst returned invalid JSON after 3 attempts: {exc}") from exc
+    mood_analysis = invoke_with_retry(
+        llm,
+        [SystemMessage(content=_MOOD_ANALYST_PROMPT), HumanMessage(content=analyst_user)],
+        MoodAnalysis,
+        "Mood Analyst",
+    )
 
     # ── Stage 2: Music Curator ───────────────────────────────────────────────
     curator_user = f"Mood analysis:\n{mood_analysis.model_dump_json(indent=2)}"
-    for attempt in range(3):
-        resp = llm.invoke([SystemMessage(content=_MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_user)])
-        try:
-            playlist_data = json.loads(strip_fences(str(resp.content).strip()))
-            playlist = Playlist(**playlist_data)
-            break
-        except (json.JSONDecodeError, ValidationError) as exc:
-            if attempt == 2:
-                raise RuntimeError(f"Music Curator returned invalid JSON after 3 attempts: {exc}") from exc
+    playlist = invoke_with_retry(
+        llm,
+        [SystemMessage(content=_MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_user)],
+        Playlist,
+        "Music Curator",
+    )
 
     if spotify_enrich:
         enriched = enrich_tracks_with_spotify([t.model_dump() for t in playlist.tracks])

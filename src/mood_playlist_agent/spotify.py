@@ -77,7 +77,7 @@ def enrich_tracks_with_spotify(tracks: list[dict]) -> list[dict]:
 
     with ThreadPoolExecutor(max_workers=5) as pool:
         futures = {pool.submit(_enrich_one, track, token): i for i, track in enumerate(tracks)}
-        result: list[dict] = [{}] * len(tracks)
+        result: list[dict] = [{} for _ in tracks]
         for future in as_completed(futures):
             result[futures[future]] = future.result()
     return result

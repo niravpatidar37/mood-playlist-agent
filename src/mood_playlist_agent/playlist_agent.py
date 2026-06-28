@@ -1,15 +1,12 @@
 """Single LangChain agent that generates a mood-based playlist."""
 
-import json
-
-from langchain_core.messages import SystemMessage, HumanMessage
-from pydantic import ValidationError
+from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
 
 from .models import Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import strip_fences, PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL, get_cached_llm
+from .utils import PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL, get_cached_llm, invoke_with_retry
 
 SYSTEM_PROMPT = (
     "You are VibeForge, an expert music curator AI trained on decades of listening data.\n"
@@ -61,33 +58,17 @@ def generate_playlist(
     if preferences:
         user_content_parts.append(f"Memory context (follow strictly):\n{preferences}")
 
-    messages = [
+    messages: list[BaseMessage] = [
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content="\n\n".join(user_content_parts)),
     ]
 
-    playlist: Playlist | None = None
-    for attempt in range(3):
-        response = llm.invoke(messages)
-        raw = strip_fences(str(response.content))
-        try:
-            data = json.loads(raw)
-            playlist = Playlist(**data)
-            # Check genre diversity — one auto-correction attempt
-            if attempt == 0:
-                correction = _check_genre_diversity(playlist)
-                if correction:
-                    messages.append(HumanMessage(content=correction))
-                    playlist = None
-                    continue
-            break
-        except (json.JSONDecodeError, ValidationError) as exc:
-            if attempt == 2:
-                raise RuntimeError(f"LLM returned invalid playlist JSON after 3 attempts: {exc}") from exc
-            messages.append(HumanMessage(content=f"Your response had errors: {exc}. Please fix and return valid JSON only."))
+    playlist = invoke_with_retry(llm, messages, Playlist, "VibeForge")
 
-    if playlist is None:
-        raise RuntimeError("Failed to generate a valid playlist.")
+    correction = _check_genre_diversity(playlist)
+    if correction:
+        messages = [*messages, HumanMessage(content=correction)]
+        playlist = invoke_with_retry(llm, messages, Playlist, "VibeForge (genre correction)")
 
     if spotify_enrich:
         enriched = enrich_tracks_with_spotify([t.model_dump() for t in playlist.tracks])
