@@ -50,8 +50,13 @@ def get_weather(city: str | None = None) -> str:
         resp = requests.get(url, params={"q": city, "appid": api_key, "units": "metric"}, timeout=5)
         resp.raise_for_status()
         data = resp.json()
-        desc = data["weather"][0]["description"]
-        temp = data["main"]["temp"]
+        weather_list = data.get("weather", [])
+        main = data.get("main", {})
+        desc = weather_list[0].get("description") if weather_list else None
+        temp = main.get("temp")
+        if desc is None or temp is None:
+            logger.warning("Unexpected weather response shape for '%s'", city)
+            return ""
         return f"{desc}, {temp:.0f}°C in {city}"
     except requests.RequestException as exc:
         logger.warning("Weather fetch failed for '%s': %s", city, exc)

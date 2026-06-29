@@ -56,6 +56,22 @@ def get_cached_llm(model: str, temperature: float = 0.8) -> ChatGroq:
     return ChatGroq(model=model, temperature=temperature)
 
 
+def _format_json_error(exc: json.JSONDecodeError) -> str:
+    return f"Response was not valid JSON at position {exc.pos}: {exc.msg}"
+
+
+def _format_validation_error(exc: ValidationError) -> str:
+    parts: list[str] = []
+    for err in exc.errors()[:3]:
+        loc = ".".join(str(p) for p in err.get("loc", []))
+        msg = err.get("msg", "invalid value")
+        parts.append(f"{loc}: {msg}" if loc else msg)
+    remaining = len(exc.errors()) - len(parts)
+    if remaining > 0:
+        parts.append(f"... and {remaining} more error(s)")
+    return "; ".join(parts)
+
+
 def invoke_with_retry(llm: ChatGroq, messages: list, model_class: type[_M], label: str, max_attempts: int = 3) -> _M:
     """Invoke LLM, extract JSON from the response, validate with Pydantic — retry on failure."""
     from langchain_core.messages import HumanMessage
@@ -66,9 +82,10 @@ def invoke_with_retry(llm: ChatGroq, messages: list, model_class: type[_M], labe
         try:
             return model_class(**json.loads(raw))
         except (json.JSONDecodeError, ValidationError) as exc:
+            summary = _format_json_error(exc) if isinstance(exc, json.JSONDecodeError) else _format_validation_error(exc)
             if attempt == max_attempts - 1:
-                raise RuntimeError(f"{label} returned invalid JSON after {max_attempts} attempts: {exc}") from exc
-            messages = [*messages, HumanMessage(content=f"Your response had errors: {exc}. Return valid JSON only.")]
+                raise RuntimeError(f"{label} returned invalid JSON after {max_attempts} attempts: {summary}") from exc
+            messages = [*messages, HumanMessage(content=f"Your response had errors: {summary}. Return valid JSON only.")]
     raise AssertionError("unreachable")
 
 
