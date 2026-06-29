@@ -31,23 +31,22 @@ PLAYLIST_CURATOR_RULES = """\
 - Artist diversity: no artist appears more than twice.
 - Support all languages and genres (Bollywood, K-pop, Latin, Afrobeats, jazz, classical, etc.)."""
 
-PLAYLIST_JSON_SCHEMA = """{
-  "name": "string",
-  "mood_summary": "string",
-  "vibe_tags": ["string"],
-  "energy_level": "low|medium|high",
-  "genres": ["string"],
-  "tracks": [
-    {
-      "title": "string",
-      "artist": "string",
-      "genre": "string",
-      "bpm": 120,
-      "spotify_search_url": "",
-      "youtube_search_url": ""
-    }
-  ]
-}"""
+_PLAYLIST_SCHEMA_DICT = {
+    "name": "string",
+    "mood_summary": "string",
+    "vibe_tags": ["string"],
+    "energy_level": "low|medium|high",
+    "genres": ["string"],
+    "tracks": [{
+        "title": "string",
+        "artist": "string",
+        "genre": "string",
+        "bpm": 120,
+        "spotify_search_url": "",
+        "youtube_search_url": "",
+    }],
+}
+PLAYLIST_JSON_SCHEMA = json.dumps(_PLAYLIST_SCHEMA_DICT, indent=2)
 
 
 @lru_cache(maxsize=16)

@@ -7,9 +7,14 @@ a more precisely targeted playlist.
 
 from __future__ import annotations
 
+import logging
+import re
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from .models import MoodAnalysis, Playlist, Track
+
+logger = logging.getLogger(__name__)
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
@@ -40,6 +45,20 @@ _MUSIC_CURATOR_PROMPT = (
     "- BPM values must fall within the bpm_range from the mood analysis."
 )
 
+
+
+def _clamp_bpm(playlist: Playlist, bpm_range: str) -> None:
+    """Clamp track BPMs into the analyst's recommended range, logging any violations."""
+    match = re.fullmatch(r"(\d+)\s*-\s*(\d+)", bpm_range.strip())
+    if not match:
+        return
+    lo, hi = int(match.group(1)), int(match.group(2))
+    for track in playlist.tracks:
+        if track.bpm is not None and not (lo <= track.bpm <= hi):
+            logger.warning(
+                "Track '%s' BPM %d outside range %s — clamping", track.title, track.bpm, bpm_range
+            )
+            track.bpm = max(lo, min(hi, track.bpm))
 
 
 def generate_playlist_with_crew(
@@ -75,6 +94,8 @@ def generate_playlist_with_crew(
         Playlist,
         "Music Curator",
     )
+
+    _clamp_bpm(playlist, mood_analysis.bpm_range)
 
     if spotify_enrich:
         enriched = enrich_tracks_with_spotify([t.model_dump() for t in playlist.tracks])
