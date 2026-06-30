@@ -33,7 +33,8 @@ PLAYLIST_CURATOR_RULES = """\
 - Skip every track listed under "recently heard" and "never play again" — no exceptions.
 - Genre diversity: no single genre should exceed 40% of the playlist (max 4 out of 10 tracks). Actively mix genres.
 - Artist diversity: no artist appears more than twice.
-- Support all languages and genres (Bollywood, K-pop, Latin, Afrobeats, jazz, classical, etc.)."""
+- Support all languages and genres (Bollywood, K-pop, Latin, Afrobeats, jazz, classical, etc.).
+- Occasion awareness: if the mood names a specific occasion (birthday, wedding, graduation, festival, etc.), include at least 2 tracks that are iconic for that occasion by title or cultural association — e.g. "In Da Club" / "Birthday" by Katy Perry for birthdays, "Can't Help Falling in Love" for weddings."""
 
 _PLAYLIST_SCHEMA_DICT = {
     "name": "string",
