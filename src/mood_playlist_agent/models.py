@@ -42,3 +42,4 @@ class MoodAnalysis(BaseModel):
     time_of_day_context: str
     activity_context: str
     musical_key_feel: Literal["major", "minor", "modal"]
+    occasion: Optional[str] = None

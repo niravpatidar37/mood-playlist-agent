@@ -68,7 +68,8 @@ Analyse the user's mood/activity input and return ONLY valid JSON — no markdow
   "avoid_genres": ["string"],
   "time_of_day_context": "string",
   "activity_context": "string",
-  "musical_key_feel": "major|minor|modal"
+  "musical_key_feel": "major|minor|modal",
+  "occasion": "null or a single word/phrase naming the specific life event (birthday, wedding, graduation, etc.) if one is clearly present — otherwise null"
 }"""
 
 _MUSIC_CURATOR_PROMPT = (
@@ -128,6 +129,13 @@ def _curate_playlist(state: AgentState) -> AgentState:
     assert mood_analysis is not None
 
     curator_content = f"Mood analysis:\n{mood_analysis.model_dump_json(indent=2)}"
+    if mood_analysis.occasion:
+        curator_content += (
+            f"\n\nOCCASION DETECTED: {mood_analysis.occasion.upper()}\n"
+            "At least 2 of your 10 tracks MUST be songs that are culturally synonymous with this occasion — "
+            "chosen because their title, lyrics, or widespread real-world use at such events makes them instantly "
+            "recognisable as belonging to it, not merely because their energy fits."
+        )
     critique = state.get("critique")
     if critique and state["refinement_attempts"] > 0:
         curator_content += (
