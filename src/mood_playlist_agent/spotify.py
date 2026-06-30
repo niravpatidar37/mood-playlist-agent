@@ -5,14 +5,14 @@ import base64
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 
 logger = logging.getLogger(__name__)
 
 
-_token_cache: dict = {}
+_token_cache: dict[str, Any] = {}
 
 
 def _get_token() -> Optional[str]:
@@ -50,7 +50,7 @@ def _get_token() -> Optional[str]:
         return None
 
 
-def _enrich_one(track: dict, token: str) -> dict:
+def _enrich_one(track: dict[str, Any], token: str) -> dict[str, Any]:
     """Fetch a real Spotify URL for a single track; returns the track unchanged on failure."""
     query = f"track:{track.get('title', '')} artist:{track.get('artist', '')}"
     try:
@@ -69,7 +69,7 @@ def _enrich_one(track: dict, token: str) -> dict:
     return track
 
 
-def enrich_tracks_with_spotify(tracks: list[dict]) -> list[dict]:
+def enrich_tracks_with_spotify(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Try to add real Spotify track URLs. Falls back to search URLs if API unavailable."""
     token = _get_token()
     if not token:
@@ -77,7 +77,7 @@ def enrich_tracks_with_spotify(tracks: list[dict]) -> list[dict]:
 
     with ThreadPoolExecutor(max_workers=5) as pool:
         futures = {pool.submit(_enrich_one, track, token): i for i, track in enumerate(tracks)}
-        result: list[dict] = [{} for _ in tracks]
+        result: list[dict[str, Any]] = [{} for _ in tracks]
         for future in as_completed(futures):
             result[futures[future]] = future.result()
     return result

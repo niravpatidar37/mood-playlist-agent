@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from functools import lru_cache
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def _format_validation_error(exc: ValidationError) -> str:
     return "; ".join(parts)
 
 
-def invoke_with_retry(llm: ChatGroq, messages: list, model_class: type[_M], label: str, max_attempts: int = 3) -> _M:
+def invoke_with_retry(llm: ChatGroq, messages: list[Any], model_class: type[_M], label: str, max_attempts: int = 3) -> _M:
     """Invoke LLM, extract JSON from the response, validate with Pydantic — retry on failure."""
     from langchain_core.messages import HumanMessage
 

@@ -5,6 +5,7 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,7 @@ def save_feedback(loved: list[dict], disliked: list[dict]) -> None:
     _save(data)
 
 
-def save_session(mood_input: str, playlist: dict) -> None:
+def save_session(mood_input: str, playlist: dict[str, Any]) -> None:
     data = _load()
     if "sessions" not in data:
         data["sessions"] = []
