@@ -214,7 +214,12 @@ with st.sidebar:
         "Extra context",
         placeholder="e.g. studying, gym, road trip…",
     )
-    use_deep = st.toggle("Two-stage analysis (--deep)", value=False)
+    mode = st.radio(
+        "Generation mode",
+        ["Fast (single agent)", "Deep (two-stage)", "Agentic (LangGraph + Critic)"],
+        index=0,
+        help="Agentic mode runs a self-correcting loop: Mood Analyst → Curator → Critic → refine if needed",
+    )
     skip_spotify = st.toggle("Skip Spotify enrichment", value=False)
 
     st.markdown("---")
@@ -226,7 +231,7 @@ with st.sidebar:
 - Rate tracks to teach it your taste over time
 """)
     st.markdown("---")
-    st.caption("Powered by [Groq](https://console.groq.com) · [LangChain](https://langchain.com) · [Streamlit](https://streamlit.io)")
+    st.caption("Powered by [Groq](https://console.groq.com) · [LangChain](https://langchain.com) · [LangGraph](https://langchain-ai.github.io/langgraph/) · [Streamlit](https://streamlit.io)")
 
 # ── Header ───────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -260,7 +265,12 @@ generate_btn = st.button("✨ Generate Playlist", type="primary", use_container_
 if generate_btn and mood.strip():
     with st.spinner("VibeForge is forging your playlist…"):
         try:
-            if use_deep:
+            if mode == "Agentic (LangGraph + Critic)":
+                from mood_playlist_agent.graph_agent import generate_playlist_with_graph
+                playlist = generate_playlist_with_graph(
+                    mood, context_extra, seed=seed, model=model, spotify_enrich=not skip_spotify
+                )
+            elif mode == "Deep (two-stage)":
                 from mood_playlist_agent.crew_agent import generate_playlist_with_crew
                 playlist = generate_playlist_with_crew(
                     mood, context_extra, seed=seed, model=model, spotify_enrich=not skip_spotify

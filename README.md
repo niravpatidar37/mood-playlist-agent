@@ -6,9 +6,12 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![uv](https://img.shields.io/badge/managed%20by-uv-purple)](https://github.com/astral-sh/uv)
 [![LLM: Groq](https://img.shields.io/badge/LLM-Groq%20%28free%29-orange)](https://console.groq.com)
+[![LangGraph](https://img.shields.io/badge/agentic-LangGraph-blueviolet)](https://langchain-ai.github.io/langgraph/)
 
 ```
-$ vibeforge --mood "late night lo-fi study session"
+$ vibeforge --mood "late night lo-fi study session" --agentic
+
+  Mood Analyst  →  Music Curator  →  Critic (8/10 ✓)  →  Finalise
 
 ╭──────────────────────────── VibeForge ─────────────────────────────╮
 │  Late Night Focus                                                   │
@@ -38,48 +41,64 @@ $ vibeforge --mood "late night lo-fi study session"
 | **10 curated tracks** | Title, artist, genre, BPM — every time |
 | **Clickable links** | Spotify search + YouTube for every track |
 | **Context-aware** | Factors in time of day and live weather |
-| **Session memory** | Learns your genre preferences over time |
+| **Session memory** | Learns your genre preferences and skips recently heard tracks |
 | **Multi-language** | Bollywood, K-pop, Latin, Afrobeats, and more |
-| **Web UI** | Streamlit app with clickable links and per-track feedback |
-| **Single or multi-agent** | LangChain (fast) or two-stage (deep analysis) |
+| **Web UI** | Streamlit app with per-track feedback |
+| **Three generation modes** | Fast · Deep (two-stage) · Agentic (LangGraph + self-correction) |
 | **100% free to run** | Groq free tier — no credit card needed |
 
 ---
 
 ## 🏗️ Architecture
 
+VibeForge offers three generation modes, each progressively more agentic:
+
+### Mode 1 — Fast (single LangChain agent)
 ```
-┌─────────────────────────────────────────────────────┐
-│                     CLI  (Typer)                    │
-│         --mood "..."   or   interactive loop        │
-└───────────────────┬─────────────────────────────────┘
-                    │
-        ┌───────────▼───────────┐
-        │   Context Builder     │  time-of-day + weather (OpenWeatherMap)
-        └───────────┬───────────┘
-                    │
-     ┌──────────────▼──────────────┐
-     │      Memory (JSON)          │  top genres/artists from past sessions
-     └──────────────┬──────────────┘
-                    │
-        ┌───────────▼────────────────────────────────┐
-        │          LangChain Agent                   │
-        │  SystemPrompt + mood + context + memory    │
-        │  → Groq (llama-3.3-70b) → JSON Playlist   │
-        └───────────┬────────────────────────────────┘
-                    │  optional
-        ┌───────────▼───────────┐
-        │  two-stage (--deep flag) │  Mood Analyst → Music Curator
-        └───────────┬───────────┘
-                    │  optional
-        ┌───────────▼───────────┐
-        │   Spotify Enrichment  │  real track URLs via Spotify API
-        └───────────┬───────────┘
-                    │
-        ┌───────────▼───────────┐
-        │    Rich Terminal UI   │  energy-colored table + clickable links
-        └───────────────────────┘
+Context + Memory → Groq LLM → Playlist
 ```
+
+### Mode 2 — Deep (`--deep`, two-stage LangChain)
+```
+Mood Analyst → Music Curator → Playlist
+```
+
+### Mode 3 — Agentic (`--agentic`, LangGraph state machine)
+
+The flagship mode. A stateful graph with a self-correcting Critic loop:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        LangGraph State Machine                          │
+│                                                                         │
+│   ┌──────────────┐    ┌───────────────┐    ┌─────────────────────┐     │
+│   │ Mood Analyst │───▶│ Music Curator │───▶│  Playlist Critic    │     │
+│   │              │    │               │    │  score 1-10         │     │
+│   │ primary mood │    │ 10 tracks     │    │  genre diversity    │     │
+│   │ BPM range    │    │ BPM clamped   │    │  artist diversity   │     │
+│   │ energy level │    │ quality mix   │    │  mood coherence     │     │
+│   └──────────────┘    └───────────────┘    └────────┬────────────┘     │
+│                               ▲                     │                  │
+│                               │   score < 7         │ score ≥ 7        │
+│                               │   (max 2 retries)   ▼                  │
+│                               └──────────────  Finalise ──▶ END        │
+│                                                                         │
+│   Shared state flows through every node:                                │
+│   mood_input · context · memory · mood_analysis · playlist · critique   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┼────────────────┐
+                    ▼               ▼                ▼
+            Spotify Enrichment  Save Session    Rich UI / Streamlit
+            (parallel, 5 threads)  (memory.json)
+```
+
+**What makes it agentic:**
+- **Stateful graph** — all agents share a typed `AgentState` object passed through every node
+- **Autonomous routing** — the graph decides whether to refine or accept based on the Critic's score
+- **Self-correction loop** — if score < 7, the Critic's feedback is injected into the next Curator call (up to 2 refinements)
+- **Specialised roles** — Mood Analyst (temperature 0.7), Curator (0.8), Critic (0.3, deterministic)
+- **Persistent memory** — learned preferences feed into every generation cycle
 
 ---
 
@@ -90,7 +109,7 @@ uv run streamlit run streamlit_app.py
 # → opens http://localhost:8501
 ```
 
-Features: mood input, seed track anchor, Spotify/YouTube links, per-track feedback (♥ / ✕) to teach VibeForge your taste over time.
+Select generation mode from the sidebar: **Fast** / **Deep** / **Agentic (LangGraph + Critic)**. Per-track ♥ / ✕ feedback is saved to `~/.vibeforge/memory.json` and shapes future playlists.
 
 ---
 
@@ -130,21 +149,27 @@ vibeforge
 # → prompts you for mood on each loop, type 'quit' to exit
 ```
 
-### Multi-agent mode (two-stage)
+### Two-stage deep analysis
 ```bash
 vibeforge --mood "heartbreak, raining outside" --deep
+```
+
+### Full agentic mode (LangGraph + self-correcting Critic)
+```bash
+vibeforge --mood "heartbreak, raining outside" --agentic
 ```
 
 ### All options
 ```
 Options:
-  --mood    -m   TEXT   Mood/activity description (skips prompt)
-  --context -c   TEXT   Extra context e.g. 'rainy day, studying'
-  --seed    -s   TEXT   Seed track as vibe anchor e.g. 'Blinding Lights by The Weeknd'
-  --deep         FLAG   Use multi-agent two-stage mode
-  --model        TEXT   LLM model override  [default: llama-3.3-70b-versatile]
-  --no-spotify   FLAG   Skip Spotify link enrichment
-  --no-feedback  FLAG   Skip post-playlist feedback prompt
+  --mood      -m   TEXT   Mood/activity description (skips prompt)
+  --context   -c   TEXT   Extra context e.g. 'rainy day, studying'
+  --seed      -s   TEXT   Seed track as vibe anchor e.g. 'Blinding Lights by The Weeknd'
+  --deep           FLAG   Two-stage mode: Mood Analyst → Music Curator
+  --agentic        FLAG   LangGraph mode: Mood Analyst → Curator → Critic → refine
+  --model          TEXT   LLM model override  [default: llama-3.3-70b-versatile]
+  --no-spotify     FLAG   Skip Spotify link enrichment
+  --no-feedback    FLAG   Skip post-playlist feedback prompt
 ```
 
 ---
@@ -197,27 +222,24 @@ uv run pytest tests/ -v
 vibeforge/
 ├── src/mood_playlist_agent/
 │   ├── __init__.py
-│   ├── main.py            # CLI (Typer) — interactive + --mood flag
-│   ├── playlist_agent.py  # LangChain single-agent
-│   ├── crew_agent.py      # Two-stage multi-agent pipeline (--deep)
-│   ├── models.py          # Pydantic Track + Playlist schemas
-│   ├── context.py         # Time-of-day + live weather
+│   ├── main.py            # CLI (Typer) — --mood, --deep, --agentic flags
+│   ├── playlist_agent.py  # Mode 1: single LangChain agent
+│   ├── crew_agent.py      # Mode 2: two-stage pipeline (--deep)
+│   ├── graph_agent.py     # Mode 3: LangGraph state machine (--agentic)
+│   ├── models.py          # Pydantic schemas: Track, Playlist, MoodAnalysis
+│   ├── context.py         # Time-of-day + live weather context
 │   ├── memory.py          # Session preference learning (favorites + freshness)
-│   ├── spotify.py         # Optional Spotify API enrichment
-│   ├── utils.py           # Shared helpers (strip_fences)
+│   ├── spotify.py         # Spotify API enrichment (parallel, 5 threads)
+│   ├── utils.py           # Shared: LLM cache, retry helper, prompt constants
 │   └── display.py         # Rich terminal UI
 ├── tests/
-│   ├── __init__.py
 │   ├── test_models.py     # Unit tests (no key needed)
-│   └── test_examples.py   # Live API tests (skipped without key)
-├── streamlit_app.py       # Web UI (run with: uv run streamlit run streamlit_app.py)
-├── main.py                # Root entry point (CLI)
+│   └── test_examples.py   # Live integration tests (skipped without key)
+├── streamlit_app.py       # Web UI (Fast / Deep / Agentic mode selector)
+├── main.py                # Root entry point
 ├── pyproject.toml         # Dependencies + build config (managed by uv)
-├── uv.lock                # Locked dependency tree
 ├── .env.example           # Environment variable template
-├── .gitignore
-├── CONTRIBUTING.md
-└── LICENSE                # MIT
+└── CONTRIBUTING.md
 ```
 
 ---

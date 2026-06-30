@@ -24,7 +24,8 @@ console = Console()
 def run(
     mood: str = typer.Option(None, "--mood", "-m", help="Mood/activity description (skips interactive prompt)"),
     context: str = typer.Option("", "--context", "-c", help="Extra context, e.g. 'rainy day, studying'"),
-    deep: bool = typer.Option(False, "--deep", help="Use two-stage analysis (Mood Analyst → Music Curator)"),
+    deep: bool = typer.Option(False, "--deep", help="Two-stage mode: Mood Analyst → Music Curator"),
+    agentic: bool = typer.Option(False, "--agentic", help="LangGraph mode: Mood Analyst → Curator → Critic → (refine) → Finalise"),
     model: str = typer.Option(DEFAULT_MODEL, "--model", help="Groq model to use"),
     no_spotify: bool = typer.Option(False, "--no-spotify", help="Skip Spotify enrichment"),
     seed: str = typer.Option("", "--seed", "-s", help="Seed track as vibe anchor, e.g. 'Blinding Lights by The Weeknd'"),
@@ -32,17 +33,20 @@ def run(
 ):
     """Generate a mood-based playlist."""
     if mood:
-        _generate_and_display(mood, context, deep, model, not no_spotify, seed, not no_feedback)
+        _generate_and_display(mood, context, deep, agentic, model, not no_spotify, seed, not no_feedback)
     else:
-        _interactive_loop(context, deep, model, not no_spotify, seed, not no_feedback)
+        _interactive_loop(context, deep, agentic, model, not no_spotify, seed, not no_feedback)
 
 
 def _generate_and_display(
-    mood: str, context: str, deep: bool, model: str, spotify: bool, seed: str, ask_feedback: bool
+    mood: str, context: str, deep: bool, agentic: bool, model: str, spotify: bool, seed: str, ask_feedback: bool
 ) -> None:
     console.print(f"\n[bold magenta]Generating playlist for:[/] [cyan]{mood}[/]\n")
     with console.status("[bold magenta]VibeForge is forging your playlist...[/]"):
-        if deep:
+        if agentic:
+            from .graph_agent import generate_playlist_with_graph
+            playlist = generate_playlist_with_graph(mood, context, seed=seed, model=model, spotify_enrich=spotify)
+        elif deep:
             from .crew_agent import generate_playlist_with_crew
             playlist = generate_playlist_with_crew(mood, context, seed=seed, model=model, spotify_enrich=spotify)
         else:
@@ -55,7 +59,7 @@ def _generate_and_display(
             console.print(f"[dim]Saved feedback — {len(loved)} loved, {len(disliked)} disliked.[/]")
 
 
-def _interactive_loop(context: str, deep: bool, model: str, spotify: bool, seed: str, ask_feedback: bool) -> None:
+def _interactive_loop(context: str, deep: bool, agentic: bool, model: str, spotify: bool, seed: str, ask_feedback: bool) -> None:
     console.print(_panel_welcome())
     while True:
         mood = Prompt.ask("\n[bold cyan]How are you feeling? (or 'quit' to exit)[/]")
@@ -63,7 +67,7 @@ def _interactive_loop(context: str, deep: bool, model: str, spotify: bool, seed:
             console.print("[dim]Goodbye! Keep vibing.[/]")
             break
         if mood.strip():
-            _generate_and_display(mood, context, deep, model, spotify, seed, ask_feedback)
+            _generate_and_display(mood, context, deep, agentic, model, spotify, seed, ask_feedback)
 
 
 def _panel_welcome() -> Panel:

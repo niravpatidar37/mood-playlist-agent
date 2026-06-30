@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from functools import lru_cache
 from typing import TYPE_CHECKING, TypeVar
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, ValidationError
 
 if TYPE_CHECKING:
     from langchain_groq import ChatGroq
+    from .models import Playlist
 
 _M = TypeVar("_M", bound=BaseModel)
 
@@ -87,6 +91,18 @@ def invoke_with_retry(llm: ChatGroq, messages: list, model_class: type[_M], labe
                 raise RuntimeError(f"{label} returned invalid JSON after {max_attempts} attempts: {summary}") from exc
             messages = [*messages, HumanMessage(content=f"Your response had errors: {summary}. Return valid JSON only.")]
     raise AssertionError("unreachable")
+
+
+def clamp_bpm(playlist: Playlist, bpm_range: str) -> None:
+    """Clamp track BPMs into the analyst's recommended range, logging violations."""
+    match = re.fullmatch(r"(\d+)\s*-\s*(\d+)", bpm_range.strip())
+    if not match:
+        return
+    lo, hi = int(match.group(1)), int(match.group(2))
+    for track in playlist.tracks:
+        if track.bpm is not None and not (lo <= track.bpm <= hi):
+            logger.warning("Track '%s' BPM %d outside %s — clamping", track.title, track.bpm, bpm_range)
+            track.bpm = max(lo, min(hi, track.bpm))
 
 
 def strip_fences(raw: str) -> str:
