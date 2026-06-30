@@ -350,17 +350,31 @@ if "playlist" in st.session_state:
 
         track_labels = [f"{i+1}. {t.title} — {t.artist}" for i, t in enumerate(pl.tracks)]
 
+        qr_col1, qr_col2, qr_col3 = st.columns([1, 1, 4])
+        with qr_col1:
+            if st.button("♥ Love all", use_container_width=True):
+                st.session_state["loved_multiselect"] = track_labels
+                st.session_state.pop("disliked_multiselect", None)
+                st.rerun()
+        with qr_col2:
+            if st.button("Clear", use_container_width=True):
+                st.session_state.pop("loved_multiselect", None)
+                st.session_state.pop("disliked_multiselect", None)
+                st.rerun()
+
         fb_col1, fb_col2 = st.columns(2)
         with fb_col1:
             loved_selected = st.multiselect(
                 "♥ Loved these tracks",
                 options=track_labels,
+                key="loved_multiselect",
                 placeholder="Select tracks you loved…",
             )
         with fb_col2:
             disliked_selected = st.multiselect(
                 "✕ Never play these again",
                 options=[t for t in track_labels if t not in loved_selected],
+                key="disliked_multiselect",
                 placeholder="Select tracks to skip…",
             )
 
@@ -369,6 +383,8 @@ if "playlist" in st.session_state:
             disliked = [pl.tracks[track_labels.index(t)].model_dump() for t in disliked_selected]
             save_feedback(loved, disliked)
             st.session_state["feedback_submitted"] = True
+            st.session_state.pop("loved_multiselect", None)
+            st.session_state.pop("disliked_multiselect", None)
             st.rerun()
     else:
         st.success("✅ Feedback saved! Your next playlist will reflect your taste.")
@@ -381,4 +397,6 @@ if "playlist" in st.session_state:
     if st.button("🔄 Generate another playlist", use_container_width=True):
         del st.session_state["playlist"]
         st.session_state.pop("feedback_submitted", None)
+        st.session_state.pop("loved_multiselect", None)
+        st.session_state.pop("disliked_multiselect", None)
         st.rerun()
