@@ -44,8 +44,30 @@ def _generate_and_display(
     console.print(f"\n[bold magenta]Generating playlist for:[/] [cyan]{mood}[/]\n")
     with console.status("[bold magenta]VibeForge is forging your playlist...[/]"):
         if agentic:
-            from .graph_agent import generate_playlist_with_graph
-            playlist = generate_playlist_with_graph(mood, context, seed=seed, model=model, spotify_enrich=spotify)
+            from .graph_agent import stream_playlist_with_graph
+            current_state: dict = {}
+            for node_name, state in stream_playlist_with_graph(mood, context, seed=seed, model=model, spotify_enrich=spotify):
+                current_state = state
+                if node_name == "analyse_mood":
+                    ma = state.get("mood_analysis")
+                    if ma:
+                        console.log(f"[cyan]Mood Analyst[/] — {ma.primary_emotion}, {ma.energy_level} energy, BPM {ma.bpm_range}")
+                elif node_name == "curate_playlist":
+                    attempts = state.get("refinement_attempts", 0)
+                    if attempts > 0:
+                        console.log(f"[cyan]Music Curator[/] — refining (attempt {attempts + 1}/3)…")
+                    else:
+                        console.log("[cyan]Music Curator[/] — building your 10-track playlist…")
+                elif node_name == "critique_playlist":
+                    critique = state.get("critique")
+                    if critique:
+                        verdict = "✓ accepted" if critique.score >= 7 else "needs refinement"
+                        console.log(f"[cyan]Critic[/] — {critique.score}/10 {verdict}")
+                elif node_name == "finalise":
+                    console.log("[cyan]Finalising[/] — enriching track links…")
+            playlist = current_state.get("playlist")
+            if playlist is None:
+                raise RuntimeError("LangGraph pipeline failed to produce a playlist.")
         elif deep:
             from .crew_agent import generate_playlist_with_crew
             playlist = generate_playlist_with_crew(mood, context, seed=seed, model=model, spotify_enrich=spotify)

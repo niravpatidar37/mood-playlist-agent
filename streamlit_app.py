@@ -263,30 +263,58 @@ generate_btn = st.button("✨ Generate Playlist", type="primary", use_container_
 
 # ── Generation ───────────────────────────────────────────────────────────────
 if generate_btn and mood.strip():
-    with st.spinner("VibeForge is forging your playlist…"):
-        try:
-            if mode == "Agentic (LangGraph + Critic)":
-                from mood_playlist_agent.graph_agent import generate_playlist_with_graph
-                playlist = generate_playlist_with_graph(
+    try:
+        if mode == "Agentic (LangGraph + Critic)":
+            from mood_playlist_agent.graph_agent import stream_playlist_with_graph
+            playlist = None
+            current_state: dict = {}
+            with st.status("VibeForge is forging your playlist…", expanded=True) as status:
+                for node_name, state in stream_playlist_with_graph(
                     mood, context_extra, seed=seed, model=model, spotify_enrich=not skip_spotify
-                )
-            elif mode == "Deep (two-stage)":
+                ):
+                    current_state = state
+                    if node_name == "analyse_mood":
+                        ma = state.get("mood_analysis")
+                        if ma:
+                            st.write(f"🔍 **Mood Analyst** — {ma.primary_emotion}, {ma.energy_level} energy, BPM {ma.bpm_range}")
+                    elif node_name == "curate_playlist":
+                        attempts = state.get("refinement_attempts", 0)
+                        if attempts > 0:
+                            st.write(f"🔄 **Music Curator** — refining playlist (attempt {attempts + 1}/3)…")
+                        else:
+                            st.write("🎵 **Music Curator** — building your 10-track playlist…")
+                    elif node_name == "critique_playlist":
+                        critique = state.get("critique")
+                        if critique:
+                            if critique.score >= 7:
+                                st.write(f"🎯 **Critic** — {critique.score}/10 ✅ accepted")
+                            else:
+                                st.write(f"🎯 **Critic** — {critique.score}/10 ⚠️ requesting refinement…")
+                    elif node_name == "finalise":
+                        st.write("✨ **Finalising** — enriching track links…")
+                playlist = current_state.get("playlist")
+                if playlist is None:
+                    raise RuntimeError("LangGraph pipeline failed to produce a playlist.")
+                status.update(label="✅ Playlist ready!", state="complete", expanded=False)
+        elif mode == "Deep (two-stage)":
+            with st.spinner("VibeForge is forging your playlist…"):
                 from mood_playlist_agent.crew_agent import generate_playlist_with_crew
                 playlist = generate_playlist_with_crew(
                     mood, context_extra, seed=seed, model=model, spotify_enrich=not skip_spotify
                 )
-            else:
+        else:
+            with st.spinner("VibeForge is forging your playlist…"):
                 playlist = generate_playlist(
                     mood, context_extra,
                     model=model,
                     spotify_enrich=not skip_spotify,
                     seed=seed,
                 )
-            st.session_state["playlist"] = playlist
-            st.session_state["feedback_submitted"] = False
-        except Exception as exc:
-            st.error(f"Generation failed: {exc}")
-            st.stop()
+        st.session_state["playlist"] = playlist
+        st.session_state["feedback_submitted"] = False
+    except Exception as exc:
+        st.error(f"Generation failed: {exc}")
+        st.stop()
 
 # ── Results ──────────────────────────────────────────────────────────────────
 if "playlist" in st.session_state:

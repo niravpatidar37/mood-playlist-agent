@@ -12,7 +12,7 @@ Four-node state machine with a self-correcting loop:
 from __future__ import annotations
 
 import logging
-from typing import TypedDict
+from typing import Any, Generator, Iterable, TypedDict, cast
 
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -214,10 +214,37 @@ def _build_graph() -> StateGraph:
     return g.compile()
 
 
-_COMPILED_GRAPH = _build_graph()
+_COMPILED_GRAPH: Any = _build_graph()
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
+def stream_playlist_with_graph(
+    mood_input: str,
+    context_extra: str = "",
+    seed: str = "",
+    model: str = DEFAULT_MODEL,
+    spotify_enrich: bool = True,
+) -> Generator[tuple[str, dict[str, Any]], None, None]:
+    """Yield (node_name, full_state) after each graph node so callers can show live progress."""
+    initial: AgentState = {
+        "mood_input": mood_input,
+        "context_extra": context_extra,
+        "seed": seed,
+        "model": model,
+        "spotify_enrich": spotify_enrich,
+        "mood_analysis": None,
+        "playlist": None,
+        "critique": None,
+        "refinement_attempts": 0,
+    }
+    current: dict[str, Any] = {}
+    stream = cast(Iterable[dict[str, Any]], _COMPILED_GRAPH.stream(initial, stream_mode="updates"))
+    for chunk in stream:
+        node_name: str = next(iter(chunk))
+        current.update(chunk[node_name])
+        yield node_name, current
+
 
 def generate_playlist_with_graph(
     mood_input: str,
