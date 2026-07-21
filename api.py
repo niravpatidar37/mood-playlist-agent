@@ -61,6 +61,18 @@ def generate(req: GenerateRequest) -> dict:
     return playlist.model_dump()
 
 
+class FeedbackRequest(BaseModel):
+    loved: list[dict] = []
+    disliked: list[dict] = []
+
+
+@app.post("/feedback")
+def feedback(req: FeedbackRequest) -> dict:
+    from mood_playlist_agent.memory import save_feedback
+    save_feedback(req.loved, req.disliked)
+    return {"saved": True}
+
+
 @app.get("/stream")
 def stream(
     mood: Annotated[str, Query()],
