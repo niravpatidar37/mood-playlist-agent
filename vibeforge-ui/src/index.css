@@ -1,4 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+:root { font-family: 'Space Grotesk', sans-serif; color: #f4f1e9; background: #11110f; font-synthesis: none; text-rendering: optimizeLegibility; }
 * { box-sizing: border-box; }
-body { margin: 0; background: #0f0f1a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+body { margin: 0; min-width: 320px; background: #11110f; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }

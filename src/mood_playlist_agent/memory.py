@@ -5,11 +5,12 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 logger = logging.getLogger(__name__)
 
 MAX_FEEDBACK_ENTRIES = 200
+MAX_PREFERENCE_CHARS = 6000
 
 
 def _memory_file() -> Path:
@@ -44,6 +45,20 @@ def _save(data: dict) -> None:
     tmp.replace(path)
 
 
+def _compact_sections(sections: list[str], max_chars: int = MAX_PREFERENCE_CHARS) -> str:
+    """Keep high-priority sections first and trim low-priority history."""
+    selected: list[str] = []
+    used = 0
+    for section in sections:
+        separator = 2 if selected else 0
+        remaining = max_chars - used - separator
+        if remaining <= 0:
+            break
+        selected.append(section[:remaining])
+        used += separator + min(len(section), remaining)
+    return "\n\n".join(selected)
+
+
 def get_preference_context() -> str:
     """Return a blended memory context: favorites to revisit + recent tracks to skip."""
     data = _load()
@@ -52,23 +67,15 @@ def get_preference_context() -> str:
     loved_tracks: dict[str, int] = feedback.get("loved", {})
     disliked_tracks: set[str] = set(feedback.get("disliked", {}).keys())
 
-    lines = []
+    sections: list[str] = []
 
     # Explicit loved tracks (highest priority — always try to match their vibe)
     if loved_tracks:
         top_loved = sorted(loved_tracks, key=loved_tracks.get, reverse=True)[:8]  # type: ignore[arg-type]
-        lines.append(
+        sections.append(
             "User's all-time loved tracks (prioritise their vibe, energy, and genre in your picks):\n"
             + "\n".join(f"  - {t}" for t in top_loved)
         )
-
-    if not sessions:
-        if disliked_tracks:
-            lines.append(
-                "Tracks to NEVER include (user disliked these):\n"
-                + "\n".join(f"  - {t}" for t in list(disliked_tracks)[:20])
-            )
-        return "\n".join(lines)
 
     # Session-based favorites: appeared in 2+ separate sessions
     track_counts: dict[str, int] = {}
@@ -104,26 +111,26 @@ def get_preference_context() -> str:
     top_genres = sorted(liked_genres, key=liked_genres.get, reverse=True)[:5]  # type: ignore[arg-type]
 
     if top_genres:
-        lines.append(f"Preferred genres: {', '.join(top_genres)}")
+        sections.append(f"Preferred genres: {', '.join(top_genres)}")
     if session_favorites:
-        lines.append(
+        sections.append(
             "Session favorites (include 1-2 of these if they fit the mood):\n"
             + "\n".join(f"  - {t}" for t in session_favorites[:8])
         )
     if recently_heard:
-        lines.append(
+        sections.append(
             "Recently heard — skip these to keep it fresh:\n"
             + "\n".join(f"  - {t}" for t in list(recently_heard)[:20])
         )
     if disliked_tracks:
-        lines.append(
+        sections.append(
             "Tracks to NEVER include (user disliked these):\n"
             + "\n".join(f"  - {t}" for t in list(disliked_tracks)[:20])
         )
-    return "\n".join(lines)
+    return _compact_sections(sections)
 
 
-def save_feedback(loved: list[dict], disliked: list[dict]) -> None:
+def save_feedback(loved: Sequence[Mapping[str, Any]], disliked: Sequence[Mapping[str, Any]]) -> None:
     """Persist explicit per-track feedback from the user."""
     data = _load()
     fb = data.setdefault("feedback", {"loved": {}, "disliked": {}})

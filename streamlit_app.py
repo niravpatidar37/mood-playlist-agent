@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from mood_playlist_agent.playlist_agent import generate_playlist
+from mood_playlist_agent.application import GenerationRequest, generation_service
 from mood_playlist_agent.memory import save_feedback
 from mood_playlist_agent.models import Track
 from mood_playlist_agent.utils import AVAILABLE_MODELS
@@ -265,13 +265,11 @@ generate_btn = st.button("✨ Generate Playlist", type="primary", use_container_
 if generate_btn and mood.strip():
     try:
         if mode == "Agentic (LangGraph + Critic)":
-            from mood_playlist_agent.graph_agent import stream_playlist_with_graph
             playlist = None
             current_state: dict = {}
+            request = GenerationRequest(mood=mood, context=context_extra, seed=seed, model=model, mode="agentic", spotify_enrich=not skip_spotify)
             with st.status("VibeForge is forging your playlist…", expanded=True) as status:
-                for node_name, state in stream_playlist_with_graph(
-                    mood, context_extra, seed=seed, model=model, spotify_enrich=not skip_spotify
-                ):
+                for node_name, state in generation_service.stream(request):
                     current_state = state
                     if node_name == "analyse_mood":
                         ma = state.get("mood_analysis")
@@ -298,17 +296,13 @@ if generate_btn and mood.strip():
                 status.update(label="✅ Playlist ready!", state="complete", expanded=False)
         elif mode == "Deep (two-stage)":
             with st.spinner("VibeForge is forging your playlist…"):
-                from mood_playlist_agent.crew_agent import generate_playlist_with_crew
-                playlist = generate_playlist_with_crew(
-                    mood, context_extra, seed=seed, model=model, spotify_enrich=not skip_spotify
+                playlist = generation_service.generate(
+                    GenerationRequest(mood=mood, context=context_extra, seed=seed, model=model, mode="deep", spotify_enrich=not skip_spotify)
                 )
         else:
             with st.spinner("VibeForge is forging your playlist…"):
-                playlist = generate_playlist(
-                    mood, context_extra,
-                    model=model,
-                    spotify_enrich=not skip_spotify,
-                    seed=seed,
+                playlist = generation_service.generate(
+                    GenerationRequest(mood=mood, context=context_extra, seed=seed, model=model, mode="fast", spotify_enrich=not skip_spotify)
                 )
         st.session_state["playlist"] = playlist
         st.session_state["feedback_submitted"] = False

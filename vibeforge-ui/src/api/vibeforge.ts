@@ -28,6 +28,16 @@ export async function generatePlaylist(params: {
   return res.json()
 }
 
+export async function enrichPlaylist(playlist: Playlist): Promise<Playlist> {
+  const res = await fetch(`${BASE}/enrich`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(playlist),
+  })
+  if (!res.ok) throw new Error('Playlist enrichment failed')
+  return res.json()
+}
+
 export function streamPlaylist(params: {
   mood: string
   context: string

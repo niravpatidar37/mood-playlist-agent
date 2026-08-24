@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+from math import ceil
 from functools import lru_cache
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, TypeVar
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +24,20 @@ if TYPE_CHECKING:
 _M = TypeVar("_M", bound=BaseModel)
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_CONTEXT_LIMIT = 8192
+DEFAULT_REQUESTED_OUTPUT = 1800
+HF_REQUESTED_OUTPUT = 1200
+HF_MODEL_PREFIX = "hf:"
+HF_FAST_MODEL = "hf:meta-llama/Llama-3.1-8B-Instruct"
+AVAILABLE_HF_MODELS = [
+    "hf:Qwen/Qwen2.5-72B-Instruct",
+    "hf:meta-llama/Llama-3.1-8B-Instruct",
+]
 AVAILABLE_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
     "gemma2-9b-it",
+    *AVAILABLE_HF_MODELS,
 ]
 
 PLAYLIST_CURATOR_RULES = """\
@@ -54,10 +69,66 @@ PLAYLIST_JSON_SCHEMA = json.dumps(_PLAYLIST_SCHEMA_DICT, indent=2)
 
 
 @lru_cache(maxsize=16)
-def get_cached_llm(model: str, temperature: float = 0.8) -> ChatGroq:
-    """Return a cached ChatGroq client; shared across both pipeline modes."""
+def get_cached_llm(model: str, temperature: float = 0.8) -> Any:
+    """Return a cached provider client shared across all pipeline modes."""
+    if model.startswith(HF_MODEL_PREFIX):
+        return HuggingFaceChatModel(model.removeprefix(HF_MODEL_PREFIX), temperature)
     from langchain_groq import ChatGroq
     return ChatGroq(model=model, temperature=temperature)
+
+
+def get_role_llm(model: str, role: str, temperature: float) -> Any:
+    """Use a faster HF model for analysis roles while retaining the chosen curator."""
+    if model.startswith(HF_MODEL_PREFIX) and role in {"analyst", "critic"}:
+        return get_cached_llm(HF_FAST_MODEL, temperature)
+    return get_cached_llm(model, temperature)
+
+
+class HuggingFaceChatModel:
+    """Small OpenAI-compatible client for Hugging Face Inference Providers."""
+
+    endpoint = "https://router.huggingface.co/v1/chat/completions"
+
+    def __init__(self, model: str, temperature: float) -> None:
+        self.model = model
+        self.temperature = temperature
+        self.requested_output = HF_REQUESTED_OUTPUT
+
+    def invoke(self, messages: list[Any]) -> Any:
+        token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        if not token:
+            raise RuntimeError("HF_TOKEN is required when using a Hugging Face model")
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": _message_role(message), "content": str(message.content)}
+                for message in messages
+            ],
+            "temperature": self.temperature,
+            "max_tokens": HF_REQUESTED_OUTPUT,
+            "stream": False,
+        }
+        try:
+            response = requests.post(
+                os.getenv("HF_API_URL", self.endpoint),
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=90,
+            )
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            return SimpleNamespace(content=content)
+        except requests.HTTPError as exc:
+            detail = exc.response.text[:500] if exc.response is not None else ""
+            logger.warning("Hugging Face rejected %s (%s): %s", self.model, exc.response.status_code if exc.response is not None else "unknown", detail)
+            raise RuntimeError(f"Hugging Face inference failed for {self.model}") from exc
+        except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
+            raise RuntimeError(f"Hugging Face inference failed for {self.model}") from exc
+
+
+def _message_role(message: Any) -> str:
+    role = getattr(message, "type", "user")
+    return {"human": "user", "ai": "assistant"}.get(role, role)
 
 
 def _format_json_error(exc: json.JSONDecodeError) -> str:
@@ -76,11 +147,43 @@ def _format_validation_error(exc: ValidationError) -> str:
     return "; ".join(parts)
 
 
-def invoke_with_retry(llm: ChatGroq, messages: list[Any], model_class: type[_M], label: str, max_attempts: int = 3) -> _M:
+def count_tokens(tokenizer: Any, text: str) -> int:
+    """Count tokens with a model tokenizer, or conservatively estimate them."""
+    if tokenizer is not None:
+        return len(tokenizer.encode(text, add_special_tokens=False))
+    return max(1, ceil(len(text) / 4))
+
+
+def count_message_tokens(messages: list[Any], tokenizer: Any = None) -> int:
+    """Count the text sent to a chat model, including a small message overhead."""
+    return sum(count_tokens(tokenizer, str(message.content)) + 4 for message in messages)
+
+
+def ensure_context_budget(
+    messages: list[Any],
+    tokenizer: Any = None,
+    context_limit: int = DEFAULT_CONTEXT_LIMIT,
+    requested_output: int = DEFAULT_REQUESTED_OUTPUT,
+) -> None:
+    """Reject prompts that leave too little room for the structured response."""
+    available_input = context_limit - requested_output
+    input_tokens = count_message_tokens(messages, tokenizer)
+    if input_tokens > available_input:
+        raise ValueError(
+            f"Prompt is too large for this model ({input_tokens} input tokens; "
+            f"maximum {available_input} with {requested_output} reserved for output)"
+        )
+
+
+def invoke_with_retry(llm: Any, messages: list[Any], model_class: type[_M], label: str, max_attempts: int = 3) -> _M:
     """Invoke LLM, extract JSON from the response, validate with Pydantic — retry on failure."""
     from langchain_core.messages import HumanMessage
 
     for attempt in range(max_attempts):
+        ensure_context_budget(
+            messages,
+            requested_output=getattr(llm, "requested_output", DEFAULT_REQUESTED_OUTPUT),
+        )
         resp = llm.invoke(messages)
         raw = strip_fences(str(resp.content))
         try:

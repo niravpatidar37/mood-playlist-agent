@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Mode } from '../types'
 
 interface Props {
@@ -28,6 +28,10 @@ export default function MoodForm({ models, loading, onSubmit }: Props) {
   const [mode, setMode] = useState<Mode>('fast')
   const [spotify, setSpotify] = useState(true)
 
+  useEffect(() => {
+    if (models.length > 0 && !models.includes(model)) setModel(models[0])
+  }, [models, model])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!mood.trim()) return
@@ -38,7 +42,7 @@ export default function MoodForm({ models, loading, onSubmit }: Props) {
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Mood input */}
       <div>
-        <label className="block text-sm font-medium text-purple-300 mb-1">
+        <label className="block text-sm font-medium text-[#d9f36a] mb-1">
           How are you feeling?
         </label>
         <textarea
@@ -46,41 +50,41 @@ export default function MoodForm({ models, loading, onSubmit }: Props) {
           onChange={e => setMood(e.target.value)}
           rows={3}
           placeholder="e.g. birthday celebration, high energy party vibes…"
-          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-purple-500 transition"
+          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-[#d9f36a] transition"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         {/* Seed track */}
         <div>
-          <label className="block text-sm font-medium text-purple-300 mb-1">
+          <label className="block text-sm font-medium text-[#d9f36a] mb-1">
             🎯 Seed track <span className="text-slate-500 font-normal">(optional)</span>
           </label>
           <input
             value={seed}
             onChange={e => setSeed(e.target.value)}
             placeholder="e.g. Blinding Lights by The Weeknd"
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#d9f36a] transition"
           />
         </div>
 
         {/* Extra context */}
         <div>
-          <label className="block text-sm font-medium text-purple-300 mb-1">
+          <label className="block text-sm font-medium text-[#d9f36a] mb-1">
             Extra context <span className="text-slate-500 font-normal">(optional)</span>
           </label>
           <input
             value={context}
             onChange={e => setContext(e.target.value)}
             placeholder="e.g. rainy evening, studying"
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#d9f36a] transition"
           />
         </div>
       </div>
 
       {/* Mode selector */}
       <div>
-        <label className="block text-sm font-medium text-purple-300 mb-2">Generation mode</label>
+        <label className="block text-sm font-medium text-[#d9f36a] mb-2">Generation mode</label>
         <div className="grid grid-cols-3 gap-2">
           {MODES.map(m => (
             <button
@@ -89,8 +93,8 @@ export default function MoodForm({ models, loading, onSubmit }: Props) {
               onClick={() => setMode(m.value)}
               className={`rounded-xl border px-3 py-2 text-left transition ${
                 mode === m.value
-                  ? 'border-purple-500 bg-purple-500/20 text-purple-200'
-                  : 'border-white/10 bg-white/5 text-slate-400 hover:border-purple-500/50'
+                  ? 'border-[#d9f36a] bg-[#d9f36a]/15 text-[#d9f36a]'
+                  : 'border-white/10 bg-white/5 text-slate-400 hover:border-[#d9f36a]/50'
               }`}
             >
               <div className="text-sm font-semibold">{m.label}</div>
@@ -103,11 +107,11 @@ export default function MoodForm({ models, loading, onSubmit }: Props) {
       <div className="flex items-center gap-6">
         {/* Model selector */}
         <div className="flex-1">
-          <label className="block text-sm font-medium text-purple-300 mb-1">LLM model</label>
+          <label className="block text-sm font-medium text-[#d9f36a] mb-1">LLM model</label>
           <select
             value={model}
             onChange={e => setModel(e.target.value)}
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+            className="model-select w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#d9f36a]"
           >
             {models.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
@@ -128,7 +132,7 @@ export default function MoodForm({ models, loading, onSubmit }: Props) {
       <button
         type="submit"
         disabled={!mood.trim() || loading}
-        className="w-full rounded-xl py-3 font-semibold text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+        className="w-full rounded-xl py-3 font-semibold text-[#11110f] bg-[#d9f36a] hover:bg-[#e6fa8c] disabled:opacity-40 disabled:cursor-not-allowed transition"
       >
         {loading ? 'Forging your playlist…' : '✨ Generate Playlist'}
       </button>

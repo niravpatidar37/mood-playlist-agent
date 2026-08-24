@@ -8,6 +8,10 @@
 [![LLM: Groq](https://img.shields.io/badge/LLM-Groq%20%28free%29-orange)](https://console.groq.com)
 [![LangGraph](https://img.shields.io/badge/agentic-LangGraph-blueviolet)](https://langchain-ai.github.io/langgraph/)
 
+![VibeForge web interface](docs/ui-preview.png)
+
+VibeForge turns a plain-language mood into a carefully structured playlist. Describe the moment, add a seed track or context, choose a generation strategy, and get ten tracks with links, BPM, genre balance, and feedback-driven personalization.
+
 ```
 $ vibeforge --mood "late night lo-fi study session" --agentic
 
@@ -45,7 +49,19 @@ $ vibeforge --mood "late night lo-fi study session" --agentic
 | **Multi-language** | Bollywood, K-pop, Latin, Afrobeats, and more |
 | **Web UI** | Streamlit app with per-track feedback |
 | **Three generation modes** | Fast · Deep (two-stage) · Agentic (LangGraph + self-correction) |
+| **Modern React workspace** | Responsive listening-room interface with live agent progress |
+| **Multi-provider models** | Groq by default, plus hosted Hugging Face Inference Providers |
+| **Context-aware prompting** | Token budgeting reserves output space and compacts older preference memory |
 | **100% free to run** | Groq free tier — no credit card needed |
+
+## ✨ Recent improvements
+
+- Added a shared application service so the FastAPI API, CLI, Streamlit app, and React UI use one generation policy.
+- Added Hugging Face router support with `hf:` model IDs and clear token configuration.
+- Added request validation, `/healthz`, sanitized provider errors, and non-buffered SSE responses.
+- Added token-budget protection: prompts reserve output capacity before model invocation.
+- Added prioritized preference compaction so loved/disliked tracks and recent taste signals survive long histories.
+- Added a responsive React frontend with an editorial listening-room visual system, mobile support, and animated progress states.
 
 ---
 
@@ -102,14 +118,33 @@ The flagship mode. A stateful graph with a self-correcting Critic loop:
 
 ---
 
-## 🌐 Web UI (Streamlit)
+## 🌐 Web UI
+
+### React interface
+
+The primary web experience lives in `vibeforge-ui/` and connects to the FastAPI backend:
+
+```bash
+# Terminal 1 — API
+uv run uvicorn api:app --reload --port 8000
+
+# Terminal 2 — React/Vite UI
+cd vibeforge-ui
+npm install
+npm run dev
+# → opens http://localhost:5173
+```
+
+The React UI supports Fast, Deep, and Agentic generation, live LangGraph progress, Hugging Face model selection, Spotify enrichment, and per-track feedback.
+
+### Streamlit interface
 
 ```bash
 uv run streamlit run streamlit_app.py
 # → opens http://localhost:8501
 ```
 
-Select generation mode from the sidebar: **Fast** / **Deep** / **Agentic (LangGraph + Critic)**. Per-track ♥ / ✕ feedback is saved to `~/.vibeforge/memory.json` and shapes future playlists.
+Select generation mode from the sidebar: **Fast** / **Deep** / **Agentic (LangGraph + Critic)**. Per-track feedback is saved to `~/.vibeforge/memory.json` and shapes future playlists.
 
 ---
 
@@ -126,6 +161,7 @@ uv sync
 # 2. Add your free Groq API key (console.groq.com — no credit card needed)
 cp .env.example .env
 # Edit .env and set GROQ_API_KEY=gsk_...
+# Or set HF_TOKEN and choose an `hf:` model in the web UI.
 
 # 3. Run
 vibeforge --mood "sunny highway road trip, windows down"
@@ -202,6 +238,12 @@ The default is Groq (free). To switch, change `--model` and the import in `playl
 | Anthropic Claude | `langchain-anthropic` | 💳 Credits |
 | OpenAI | `langchain-openai` | 💳 Credits |
 
+### Hugging Face models
+
+VibeForge also supports hosted Hugging Face Inference Providers through the OpenAI-compatible router. Add `HF_TOKEN` to `.env`, then select an `hf:` model in the UI or send one through the API. Included options are `hf:Qwen/Qwen2.5-72B-Instruct` and `hf:meta-llama/Llama-3.1-8B-Instruct`.
+
+Hosted inference keeps model weights out of the application image. A future local GPU adapter can use `transformers` without changing the playlist pipelines.
+
 ---
 
 ## 🧪 Tests
@@ -236,6 +278,10 @@ vibeforge/
 │   ├── test_models.py     # Unit tests (no key needed)
 │   └── test_examples.py   # Live integration tests (skipped without key)
 ├── streamlit_app.py       # Web UI (Fast / Deep / Agentic mode selector)
+├── api.py                 # FastAPI HTTP + SSE adapter
+├── docs/system-design.md  # Current and production-target architecture
+├── docs/ui-preview.png    # React UI preview
+├── vibeforge-ui/          # React + Vite frontend
 ├── main.py                # Root entry point
 ├── pyproject.toml         # Dependencies + build config (managed by uv)
 ├── .env.example           # Environment variable template

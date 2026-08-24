@@ -3,23 +3,38 @@
 from __future__ import annotations
 
 import json
-from typing import Annotated
+import logging
+import os
+from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
+from mood_playlist_agent.application import GenerationRequest, generation_service
+from mood_playlist_agent.models import Playlist
 from mood_playlist_agent.utils import DEFAULT_MODEL, AVAILABLE_MODELS
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="VibeForge API", version="1.0.0")
 
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "VIBEFORGE_CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://192.168.2.142:5173",
+    ).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -28,12 +43,19 @@ app.add_middleware(
 # ── Request / Response schemas ────────────────────────────────────────────────
 
 class GenerateRequest(BaseModel):
-    mood: str
-    context: str = ""
-    seed: str = ""
+    mood: str = Field(min_length=1, max_length=500)
+    context: str = Field(default="", max_length=500)
+    seed: str = Field(default="", max_length=200)
     model: str = DEFAULT_MODEL
-    mode: str = "fast"          # "fast" | "deep" | "agentic"
+    mode: str = "fast"
     spotify_enrich: bool = True
+
+    def to_application_request(self) -> GenerationRequest:
+        return GenerationRequest(**self.model_dump())
+
+
+def _empty_feedback() -> list[dict[str, Any]]:
+    return []
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -43,31 +65,40 @@ def list_models() -> list[str]:
     return AVAILABLE_MODELS
 
 
+@app.get("/healthz")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.post("/generate")
-def generate(req: GenerateRequest) -> dict:
-    """Fast and Deep modes — returns the full playlist as JSON."""
-    if req.mode == "deep":
-        from mood_playlist_agent.crew_agent import generate_playlist_with_crew
-        playlist = generate_playlist_with_crew(
-            req.mood, req.context, seed=req.seed,
-            model=req.model, spotify_enrich=req.spotify_enrich,
-        )
-    else:
-        from mood_playlist_agent.playlist_agent import generate_playlist
-        playlist = generate_playlist(
-            req.mood, req.context,
-            model=req.model, spotify_enrich=req.spotify_enrich, seed=req.seed,
-        )
-    return playlist.model_dump()
+def generate(req: GenerateRequest) -> dict[str, Any]:
+    """Return a playlist immediately; Spotify enrichment is handled separately."""
+    try:
+        return generation_service.generate(req.to_application_request(), defer_enrichment=True).model_dump()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        logger.exception("Playlist generation failed")
+        raise HTTPException(status_code=503, detail="Playlist generation is temporarily unavailable") from None
+
+
+@app.post("/enrich")
+def enrich(req: Playlist) -> dict[str, Any]:
+    """Best-effort Spotify enrichment after the playlist has reached the client."""
+    try:
+        return generation_service.enrich(req).model_dump()
+    except Exception:
+        logger.exception("Playlist enrichment failed")
+        return req.model_dump()
 
 
 class FeedbackRequest(BaseModel):
-    loved: list[dict] = []
-    disliked: list[dict] = []
+    loved: list[dict[str, Any]] = Field(default_factory=_empty_feedback)
+    disliked: list[dict[str, Any]] = Field(default_factory=_empty_feedback)
 
 
 @app.post("/feedback")
-def feedback(req: FeedbackRequest) -> dict:
+def feedback(req: FeedbackRequest) -> dict[str, bool]:
     from mood_playlist_agent.memory import save_feedback
     save_feedback(req.loved, req.disliked)
     return {"saved": True}
@@ -82,14 +113,19 @@ def stream(
     spotify_enrich: Annotated[bool, Query()] = True,
 ) -> StreamingResponse:
     """Agentic mode — streams SSE events, one per graph node."""
-    from mood_playlist_agent.graph_agent import stream_playlist_with_graph
+    request = GenerationRequest(
+        mood=mood,
+        context=context,
+        seed=seed,
+        model=model,
+        mode="agentic",
+        spotify_enrich=spotify_enrich,
+    )
 
     def event_generator():
         try:
-            for node_name, state in stream_playlist_with_graph(
-                mood, context, seed=seed, model=model, spotify_enrich=spotify_enrich,
-            ):
-                payload: dict = {"node": node_name}
+            for node_name, state in generation_service.stream(request):
+                payload: dict[str, Any] = {"node": node_name}
 
                 if node_name == "analyse_mood" and state.get("mood_analysis"):
                     ma = state["mood_analysis"]
@@ -110,7 +146,14 @@ def stream(
                 yield f"data: {json.dumps(payload)}\n\n"
 
             yield "data: {\"node\": \"done\"}\n\n"
-        except Exception as exc:
+        except ValueError as exc:
             yield f"data: {json.dumps({'node': 'error', 'message': str(exc)})}\n\n"
+        except Exception:
+            logger.exception("Playlist stream failed")
+            yield 'data: {"node": "error", "message": "Playlist generation is temporarily unavailable"}\n\n'
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+    )

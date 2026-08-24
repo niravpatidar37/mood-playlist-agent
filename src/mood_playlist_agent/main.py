@@ -11,7 +11,7 @@ from rich.text import Text
 
 load_dotenv()
 
-from .playlist_agent import generate_playlist
+from .application import GenerationRequest, generation_service
 from .display import print_playlist, collect_feedback
 from .memory import save_feedback
 from .utils import DEFAULT_MODEL
@@ -44,9 +44,9 @@ def _generate_and_display(
     console.print(f"\n[bold magenta]Generating playlist for:[/] [cyan]{mood}[/]\n")
     with console.status("[bold magenta]VibeForge is forging your playlist...[/]"):
         if agentic:
-            from .graph_agent import stream_playlist_with_graph
             current_state: dict = {}
-            for node_name, state in stream_playlist_with_graph(mood, context, seed=seed, model=model, spotify_enrich=spotify):
+            request = GenerationRequest(mood=mood, context=context, seed=seed, model=model, mode="agentic", spotify_enrich=spotify)
+            for node_name, state in generation_service.stream(request):
                 current_state = state
                 if node_name == "analyse_mood":
                     ma = state.get("mood_analysis")
@@ -69,10 +69,13 @@ def _generate_and_display(
             if playlist is None:
                 raise RuntimeError("LangGraph pipeline failed to produce a playlist.")
         elif deep:
-            from .crew_agent import generate_playlist_with_crew
-            playlist = generate_playlist_with_crew(mood, context, seed=seed, model=model, spotify_enrich=spotify)
+            playlist = generation_service.generate(
+                GenerationRequest(mood=mood, context=context, seed=seed, model=model, mode="deep", spotify_enrich=spotify)
+            )
         else:
-            playlist = generate_playlist(mood, context, model=model, spotify_enrich=spotify, seed=seed)
+            playlist = generation_service.generate(
+                GenerationRequest(mood=mood, context=context, seed=seed, model=model, mode="fast", spotify_enrich=spotify)
+            )
     print_playlist(playlist)
     if ask_feedback:
         loved, disliked = collect_feedback(playlist)

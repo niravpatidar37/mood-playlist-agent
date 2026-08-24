@@ -12,6 +12,7 @@ Four-node state machine with a self-correcting loop:
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from typing import Any, Generator, Iterable, TypedDict, cast
 
 from langgraph.graph import StateGraph, END
@@ -24,7 +25,7 @@ from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
 from .utils import (
     PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL,
-    get_cached_llm, invoke_with_retry, clamp_bpm,
+    get_cached_llm, get_role_llm, invoke_with_retry, clamp_bpm,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,7 +106,7 @@ Score 1–4: significant problems — be specific about what must change."""
 # ── Node functions ────────────────────────────────────────────────────────────
 
 def _analyse_mood(state: AgentState) -> AgentState:
-    llm = get_cached_llm(state["model"], 0.7)
+    llm = get_role_llm(state["model"], "analyst", 0.7)
     context = build_context_string(state["context_extra"], seed=state["seed"])
     preferences = get_preference_context()
     user_msg = "\n\n".join(filter(None, [
@@ -157,10 +158,20 @@ def _curate_playlist(state: AgentState) -> AgentState:
 
 
 def _critique_playlist(state: AgentState) -> AgentState:
-    llm = get_cached_llm(state["model"], 0.3)
     playlist = state["playlist"]
     assert playlist is not None
 
+    deterministic_issues = _validate_playlist(playlist, state["mood_analysis"])
+    if deterministic_issues:
+        critique = PlaylistCritique(
+            score=5,
+            issues=deterministic_issues,
+            feedback="Fix every deterministic playlist rule violation before the next attempt.",
+        )
+        logger.info("Deterministic playlist validation found %d issue(s)", len(deterministic_issues))
+        return {**state, "critique": critique}
+
+    llm = get_role_llm(state["model"], "critic", 0.3)
     critique = invoke_with_retry(
         llm,
         [
@@ -172,6 +183,27 @@ def _critique_playlist(state: AgentState) -> AgentState:
     )
     logger.info("Critic score: %d/10 — %s", critique.score, critique.feedback[:100])
     return {**state, "critique": critique}
+
+
+def _validate_playlist(playlist: Playlist, mood_analysis: MoodAnalysis | None) -> list[str]:
+    """Check objective constraints before spending a model call on subjective critique."""
+    issues: list[str] = []
+    if len(playlist.tracks) != 10:
+        issues.append("Playlist must contain exactly 10 tracks")
+    artist_counts = Counter(track.artist.strip().lower() for track in playlist.tracks)
+    if any(count > 2 for count in artist_counts.values()):
+        issues.append("Artist diversity violation: no artist may appear more than twice")
+    genre_counts = Counter(track.genre.strip().lower() for track in playlist.tracks)
+    if any(count > 4 for count in genre_counts.values()):
+        issues.append("Genre diversity violation: no genre may exceed four tracks")
+    if mood_analysis:
+        import re
+        match = re.fullmatch(r"(\d+)\s*-\s*(\d+)", mood_analysis.bpm_range.strip())
+        if match:
+            low, high = int(match.group(1)), int(match.group(2))
+            if any(track.bpm is not None and not low <= track.bpm <= high for track in playlist.tracks):
+                issues.append(f"BPM violation: tracks must stay within {mood_analysis.bpm_range}")
+    return issues
 
 
 def _route_after_critique(state: AgentState) -> str:
