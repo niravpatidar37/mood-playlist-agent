@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -47,15 +47,11 @@ class GenerateRequest(BaseModel):
     context: str = Field(default="", max_length=500)
     seed: str = Field(default="", max_length=200)
     model: str = DEFAULT_MODEL
-    mode: str = "fast"
+    mode: Literal["fast", "deep", "agentic"] = "fast"
     spotify_enrich: bool = True
 
     def to_application_request(self) -> GenerationRequest:
         return GenerationRequest(**self.model_dump())
-
-
-def _empty_feedback() -> list[dict[str, Any]]:
-    return []
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -92,15 +88,28 @@ def enrich(req: Playlist) -> dict[str, Any]:
         return req.model_dump()
 
 
+class FeedbackTrack(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    artist: str = Field(min_length=1, max_length=200)
+
+
+def _empty_feedback_tracks() -> list[FeedbackTrack]:
+    return []
+
+
 class FeedbackRequest(BaseModel):
-    loved: list[dict[str, Any]] = Field(default_factory=_empty_feedback)
-    disliked: list[dict[str, Any]] = Field(default_factory=_empty_feedback)
+    loved: list[FeedbackTrack] = Field(default_factory=_empty_feedback_tracks, max_length=200)
+    disliked: list[FeedbackTrack] = Field(default_factory=_empty_feedback_tracks, max_length=200)
 
 
 @app.post("/feedback")
 def feedback(req: FeedbackRequest) -> dict[str, bool]:
     from mood_playlist_agent.memory import save_feedback
-    save_feedback(req.loved, req.disliked)
+    save_feedback(
+        [track.model_dump() for track in req.loved],
+        [track.model_dump() for track in req.disliked],
+    )
+    generation_service.invalidate_cache()
     return {"saved": True}
 
 

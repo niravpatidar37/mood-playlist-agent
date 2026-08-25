@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Mapping, Sequence
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 MAX_FEEDBACK_ENTRIES = 200
 MAX_PREFERENCE_CHARS = 6000
+_memory_lock = threading.RLock()
 
 
 def _memory_file() -> Path:
@@ -61,7 +63,8 @@ def _compact_sections(sections: list[str], max_chars: int = MAX_PREFERENCE_CHARS
 
 def get_preference_context() -> str:
     """Return a blended memory context: favorites to revisit + recent tracks to skip."""
-    data = _load()
+    with _memory_lock:
+        data = _load()
     sessions = data.get("sessions", [])
     feedback = data.get("feedback", {})
     loved_tracks: dict[str, int] = feedback.get("loved", {})
@@ -132,35 +135,37 @@ def get_preference_context() -> str:
 
 def save_feedback(loved: Sequence[Mapping[str, Any]], disliked: Sequence[Mapping[str, Any]]) -> None:
     """Persist explicit per-track feedback from the user."""
-    data = _load()
-    fb = data.setdefault("feedback", {"loved": {}, "disliked": {}})
-    for t in loved:
-        key = f"{t['title']} by {t['artist']}"
-        fb["loved"][key] = fb["loved"].get(key, 0) + 1
-        fb["disliked"].pop(key, None)  # un-dislike if previously marked
-    for t in disliked:
-        key = f"{t['title']} by {t['artist']}"
-        fb["disliked"][key] = fb["disliked"].get(key, 0) + 1
-        fb["loved"].pop(key, None)  # un-love if previously marked
-    for bucket in ("loved", "disliked"):
-        if len(fb[bucket]) > MAX_FEEDBACK_ENTRIES:
-            fb[bucket] = dict(
-                sorted(fb[bucket].items(), key=lambda kv: kv[1], reverse=True)[:MAX_FEEDBACK_ENTRIES]
-            )
-    _save(data)
+    with _memory_lock:
+        data = _load()
+        fb = data.setdefault("feedback", {"loved": {}, "disliked": {}})
+        for t in loved:
+            key = f"{t['title']} by {t['artist']}"
+            fb["loved"][key] = fb["loved"].get(key, 0) + 1
+            fb["disliked"].pop(key, None)  # un-dislike if previously marked
+        for t in disliked:
+            key = f"{t['title']} by {t['artist']}"
+            fb["disliked"][key] = fb["disliked"].get(key, 0) + 1
+            fb["loved"].pop(key, None)  # un-love if previously marked
+        for bucket in ("loved", "disliked"):
+            if len(fb[bucket]) > MAX_FEEDBACK_ENTRIES:
+                fb[bucket] = dict(
+                    sorted(fb[bucket].items(), key=lambda kv: kv[1], reverse=True)[:MAX_FEEDBACK_ENTRIES]
+                )
+        _save(data)
 
 
 def save_session(mood_input: str, playlist: dict[str, Any]) -> None:
-    data = _load()
-    if "sessions" not in data:
-        data["sessions"] = []
-    data["sessions"].append({
-        "timestamp": datetime.now().isoformat(),
-        "mood_input": mood_input,
-        "playlist_name": playlist.get("name", ""),
-        "genres": playlist.get("genres", []),
-        "tracks": [{"title": t["title"], "artist": t["artist"]} for t in playlist.get("tracks", [])],
-    })
-    # Keep last 20 sessions
-    data["sessions"] = data["sessions"][-20:]
-    _save(data)
+    with _memory_lock:
+        data = _load()
+        if "sessions" not in data:
+            data["sessions"] = []
+        data["sessions"].append({
+            "timestamp": datetime.now().isoformat(),
+            "mood_input": mood_input,
+            "playlist_name": playlist.get("name", ""),
+            "genres": playlist.get("genres", []),
+            "tracks": [{"title": t["title"], "artist": t["artist"]} for t in playlist.get("tracks", [])],
+        })
+        # Keep last 20 sessions
+        data["sessions"] = data["sessions"][-20:]
+        _save(data)

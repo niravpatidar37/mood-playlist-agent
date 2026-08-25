@@ -71,6 +71,8 @@ def test_generation_service_caches_base_playlist(monkeypatch):
 
     service = GenerationService()
     playlist = make_playlist()
+    for index, track in enumerate(playlist.tracks):
+        track.genre = f"Genre {index}"
     calls = 0
 
     def generate(_request):
@@ -87,6 +89,60 @@ def test_generation_service_caches_base_playlist(monkeypatch):
     assert calls == 1
     assert first is not second
     assert first.name == second.name
+
+
+def test_generation_service_rejects_invalid_generated_playlist(monkeypatch):
+    from mood_playlist_agent.application import GenerationService
+    from tests.test_models import make_playlist
+
+    service = GenerationService()
+    playlist = make_playlist()
+    monkeypatch.setattr(service, "_generate_uncached", lambda _request: playlist)
+
+    with pytest.raises(RuntimeError, match="hard validation"):
+        service.generate(GenerationRequest(mood="focus", spotify_enrich=False))
+
+
+def test_generation_service_invalidate_cache_forgets_cached_playlist(monkeypatch):
+    from mood_playlist_agent.application import GenerationService
+    from tests.test_models import make_playlist
+
+    service = GenerationService()
+    playlist = make_playlist()
+    for index, track in enumerate(playlist.tracks):
+        track.genre = f"Genre {index}"
+    calls = 0
+
+    def generate(_request):
+        nonlocal calls
+        calls += 1
+        return playlist
+
+    monkeypatch.setattr(service, "_generate_uncached", generate)
+    request = GenerationRequest(mood="focus", spotify_enrich=False)
+
+    service.generate(request)
+    service.invalidate_cache()
+    service.generate(request)
+
+    assert calls == 2
+
+
+def test_generation_service_stream_passes_enrichment_setting(monkeypatch):
+    import mood_playlist_agent.graph_agent as graph_agent
+    from mood_playlist_agent.application import GenerationService
+
+    observed: dict[str, bool] = {}
+
+    def stream(_mood, _context, *, seed, model, spotify_enrich):
+        observed["spotify_enrich"] = spotify_enrich
+        yield "finalise", {"playlist": None}
+
+    monkeypatch.setattr(graph_agent, "stream_playlist_with_graph", stream)
+    request = GenerationRequest(mood="focus", mode="agentic", spotify_enrich=True)
+    list(GenerationService().stream(request))
+
+    assert observed["spotify_enrich"] is True
 
 
 def test_deterministic_playlist_issues_skip_critic_model():
@@ -113,3 +169,16 @@ def test_deterministic_playlist_issues_skip_critic_model():
 
     assert result["critique"].score == 5
     assert "Artist diversity" in result["critique"].issues[0]
+
+
+def test_playlist_rule_evaluator_returns_langsmith_score():
+    from mood_playlist_agent.quality import playlist_rule_evaluator
+    from tests.test_models import make_playlist
+
+    playlist = make_playlist()
+    for index, track in enumerate(playlist.tracks):
+        track.genre = f"Genre {index}"
+    result = playlist_rule_evaluator({}, {"playlist": playlist})
+
+    assert result["key"] == "playlist_rules"
+    assert result["score"] == 1.0

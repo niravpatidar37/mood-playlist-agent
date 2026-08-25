@@ -7,10 +7,10 @@ from pydantic import BaseModel, Field
 
 
 class Track(BaseModel):
-    title: str
-    artist: str
-    genre: str
-    bpm: Optional[int] = None
+    title: str = Field(min_length=1, max_length=200)
+    artist: str = Field(min_length=1, max_length=200)
+    genre: str = Field(min_length=1, max_length=100)
+    bpm: Optional[int] = Field(default=None, ge=0, le=300)
     spotify_search_url: str = ""
     youtube_search_url: str = ""
 
@@ -23,12 +23,12 @@ class Track(BaseModel):
 
 
 class Playlist(BaseModel):
-    name: str = Field(description="Creative playlist name reflecting the mood")
-    mood_summary: str = Field(description="2-3 sentence description of the detected mood and why these songs fit")
-    vibe_tags: list[str] = Field(description="3-5 short tags like ['chill', 'lo-fi', 'late-night']")
+    name: str = Field(min_length=1, max_length=200, description="Creative playlist name reflecting the mood")
+    mood_summary: str = Field(min_length=1, max_length=1000, description="2-3 sentence description of the detected mood and why these songs fit")
+    vibe_tags: list[str] = Field(min_length=1, max_length=8, description="Short tags like ['chill', 'lo-fi', 'late-night']")
     energy_level: Literal["low", "medium", "high"]
     tracks: list[Track] = Field(description="Exactly 10 recommended tracks", min_length=10, max_length=10)
-    genres: list[str] = Field(description="Primary genres featured in this playlist")
+    genres: list[str] = Field(min_length=1, max_length=20, description="Primary genres featured in this playlist")
 
 
 class MoodAnalysis(BaseModel):

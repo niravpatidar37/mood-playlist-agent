@@ -60,7 +60,6 @@ export default function App() {
         onEvent: (evt) => setEvents(prev => [...prev, evt]),
         onPlaylist: (pl) => {
           setPlaylist(pl)
-          if (params.spotify_enrich) enrichPlaylist(pl).then(setPlaylist).catch(() => {})
           finish()
         },
         onError: (msg) => { setError(msg); finish() },

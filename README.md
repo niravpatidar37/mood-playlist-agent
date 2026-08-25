@@ -47,12 +47,12 @@ $ vibeforge --mood "late night lo-fi study session" --agentic
 | **Context-aware** | Factors in time of day and live weather |
 | **Session memory** | Learns your genre preferences and skips recently heard tracks |
 | **Multi-language** | Bollywood, K-pop, Latin, Afrobeats, and more |
-| **Web UI** | Streamlit app with per-track feedback |
+| **Web UI** | React and Streamlit interfaces with per-track feedback |
 | **Three generation modes** | Fast · Deep (two-stage) · Agentic (LangGraph + self-correction) |
 | **Modern React workspace** | Responsive listening-room interface with live agent progress |
 | **Multi-provider models** | Groq by default, plus hosted Hugging Face Inference Providers |
 | **Context-aware prompting** | Token budgeting reserves output space and compacts older preference memory |
-| **100% free to run** | Groq free tier — no credit card needed |
+| **Free-tier friendly** | Groq and Hugging Face can be used within their available free tiers |
 
 ## ✨ Recent improvements
 
@@ -62,6 +62,10 @@ $ vibeforge --mood "late night lo-fi study session" --agentic
 - Added token-budget protection: prompts reserve output capacity before model invocation.
 - Added prioritized preference compaction so loved/disliked tracks and recent taste signals survive long histories.
 - Added a responsive React frontend with an editorial listening-room visual system, mobile support, and animated progress states.
+- Added hard playlist validation for track count, artist and genre diversity, duplicate tracks, and BPM bounds across all generation modes.
+- Added bounded in-process caching and cache invalidation after feedback changes user preferences.
+- Added typed feedback payloads and serialized local memory writes for safer single-process use.
+- Agentic finalisation now fails instead of publishing a playlist that still violates hard rules after refinement.
 
 ---
 
@@ -105,7 +109,7 @@ The flagship mode. A stateful graph with a self-correcting Critic loop:
                                     │
                     ┌───────────────┼────────────────┐
                     ▼               ▼                ▼
-            Spotify Enrichment  Save Session    Rich UI / Streamlit
+            Spotify Enrichment  Save Session    Rich UI / Adapters
             (parallel, 5 threads)  (memory.json)
 ```
 
@@ -114,7 +118,10 @@ The flagship mode. A stateful graph with a self-correcting Critic loop:
 - **Autonomous routing** — the graph decides whether to refine or accept based on the Critic's score
 - **Self-correction loop** — if score < 7, the Critic's feedback is injected into the next Curator call (up to 2 refinements)
 - **Specialised roles** — Mood Analyst (temperature 0.7), Curator (0.8), Critic (0.3, deterministic)
-- **Persistent memory** — learned preferences feed into every generation cycle
+- **Persistent memory** — learned preferences feed into every generation cycle; local writes are serialized within a process
+- **Hard output contract** — all modes validate the final playlist before caching or returning it
+
+The current implementation is designed for local or single-process use. The in-process cache is bounded but is not shared across workers, and `memory.json` is not suitable for multi-process or multi-user deployment. Authentication, per-user cache isolation, durable jobs, replayable stream events, rate limiting, and SQLite/Postgres persistence belong to the production architecture described in [docs/system-design.md](docs/system-design.md).
 
 ---
 
@@ -135,7 +142,7 @@ npm run dev
 # → opens http://localhost:5173
 ```
 
-The React UI supports Fast, Deep, and Agentic generation, live LangGraph progress, Hugging Face model selection, Spotify enrichment, and per-track feedback.
+The React UI supports Fast, Deep, and Agentic generation, live LangGraph progress, Hugging Face model selection, Spotify enrichment, and per-track feedback. Agentic progress is streamed over SSE; the playlist is enriched once according to the selected Spotify setting.
 
 ### Streamlit interface
 
@@ -144,7 +151,7 @@ uv run streamlit run streamlit_app.py
 # → opens http://localhost:8501
 ```
 
-Select generation mode from the sidebar: **Fast** / **Deep** / **Agentic (LangGraph + Critic)**. Per-track feedback is saved to `~/.vibeforge/memory.json` and shapes future playlists.
+Select generation mode from the sidebar: **Fast** / **Deep** / **Agentic (LangGraph + Critic)**. Per-track feedback is saved to `~/.vibeforge/memory.json`, invalidates the local generation cache, and shapes future playlists.
 
 ---
 
@@ -244,6 +251,18 @@ VibeForge also supports hosted Hugging Face Inference Providers through the Open
 
 Hosted inference keeps model weights out of the application image. A future local GPU adapter can use `transformers` without changing the playlist pipelines.
 
+### LangSmith observability
+
+VibeForge supports opt-in LangSmith tracing for the application service, LangGraph workflow, LangChain model calls, and the custom Hugging Face adapter. Add `LANGCHAIN_API_KEY`, set `LANGCHAIN_TRACING_V2=true`, and choose a `LANGCHAIN_PROJECT` in `.env`:
+
+```env
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langsmith_api_key_here
+LANGCHAIN_PROJECT=vibeforge-development
+```
+
+The trace records generation stages, model latency, retries, validation failures, refinement count, and provider errors. Do not put provider tokens or raw private memory into LangSmith metadata. Objective playlist checks are available through `mood_playlist_agent.quality.playlist_rule_evaluator` for LangSmith evaluations.
+
 ---
 
 ## 🧪 Tests
@@ -271,6 +290,7 @@ vibeforge/
 │   ├── models.py          # Pydantic schemas: Track, Playlist, MoodAnalysis
 │   ├── context.py         # Time-of-day + live weather context
 │   ├── memory.py          # Session preference learning (favorites + freshness)
+│   ├── quality.py         # Deterministic playlist validators + LangSmith evaluator
 │   ├── spotify.py         # Spotify API enrichment (parallel, 5 threads)
 │   ├── utils.py           # Shared: LLM cache, retry helper, prompt constants
 │   └── display.py         # Rich terminal UI

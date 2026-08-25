@@ -10,13 +10,16 @@ from collections.abc import Generator
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from langsmith import traceable
 
 from .models import Playlist, Track
+from .quality import validate_playlist
 from .spotify import enrich_tracks_with_spotify
 from .utils import AVAILABLE_MODELS, DEFAULT_MODEL
 
 GenerationMode = Literal["fast", "deep", "agentic"]
 CACHE_TTL_SECONDS = 900
+CACHE_MAX_ENTRIES = 128
 
 
 class GenerationRequest(BaseModel):
@@ -51,6 +54,11 @@ class GenerationService:
     def _cache_key(self, request: GenerationRequest) -> str:
         return json.dumps(request.model_dump(exclude={"spotify_enrich"}), sort_keys=True)
 
+    def invalidate_cache(self) -> None:
+        with self._cache_lock:
+            self._cache.clear()
+
+    @traceable(name="vibeforge.generate", run_type="chain")
     def generate(self, request: GenerationRequest, defer_enrichment: bool = False) -> Playlist:
         request = request.normalized()
         cache_key = self._cache_key(request)
@@ -65,7 +73,13 @@ class GenerationService:
         if playlist is None:
             pipeline_request = request.model_copy(update={"spotify_enrich": False})
             playlist = self._generate_uncached(pipeline_request)
+            issues = validate_playlist(playlist)
+            if issues:
+                raise RuntimeError(f"Generated playlist failed hard validation: {'; '.join(issues)}")
             with self._cache_lock:
+                if len(self._cache) >= CACHE_MAX_ENTRIES:
+                    oldest_key = min(self._cache, key=lambda key: self._cache[key][0])
+                    self._cache.pop(oldest_key, None)
                 self._cache[cache_key] = (time.monotonic(), copy.deepcopy(playlist))
         if request.spotify_enrich and not defer_enrichment:
             playlist = self.enrich(playlist)
@@ -91,7 +105,13 @@ class GenerationService:
         if request.mode != "agentic":
             raise ValueError("streaming is only supported for agentic generation")
         from .graph_agent import stream_playlist_with_graph
-        yield from stream_playlist_with_graph(request.mood, request.context, seed=request.seed, model=request.model, spotify_enrich=False)
+        yield from stream_playlist_with_graph(
+            request.mood,
+            request.context,
+            seed=request.seed,
+            model=request.model,
+            spotify_enrich=request.spotify_enrich,
+        )
 
 
 generation_service = GenerationService()

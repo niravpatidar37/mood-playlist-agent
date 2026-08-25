@@ -53,6 +53,16 @@ flowchart TB
 | Repository layer | Sessions, feedback, job state | Atomic writes locally; transactional writes in production |
 | Worker | Async execution and event publication | Idempotency key per generation request |
 
+### Guarantees in the local implementation
+
+- All modes reject playlists that violate track count, artist diversity, genre diversity, duplicate-track, or BPM constraints.
+- Agentic finalisation fails rather than returning a playlist that still violates hard rules after the refinement budget is exhausted.
+- Feedback invalidates the in-process generation cache so preference changes take effect immediately.
+- Local memory writes are serialized within a process; SQLite is still required for multi-process deployment.
+- Streaming enrichment follows the request setting and is performed once by the selected adapter.
+
+These are local-process guarantees. Authentication, per-user cache isolation, durable jobs, replayable events, rate limits, and distributed persistence remain production requirements.
+
 ## Key design decisions
 
 1. **Request IDs and idempotency:** every generation receives a correlation ID; production POST requests accept an idempotency key so client retries do not create duplicate jobs.

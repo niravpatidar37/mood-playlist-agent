@@ -12,7 +12,6 @@ Four-node state machine with a self-correcting loop:
 from __future__ import annotations
 
 import logging
-from collections import Counter
 from typing import Any, Generator, Iterable, TypedDict, cast
 
 from langgraph.graph import StateGraph, END
@@ -22,6 +21,7 @@ from pydantic import BaseModel, Field
 from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
+from .quality import validate_playlist as _validate_playlist
 from .spotify import enrich_tracks_with_spotify
 from .utils import (
     PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL,
@@ -185,27 +185,6 @@ def _critique_playlist(state: AgentState) -> AgentState:
     return {**state, "critique": critique}
 
 
-def _validate_playlist(playlist: Playlist, mood_analysis: MoodAnalysis | None) -> list[str]:
-    """Check objective constraints before spending a model call on subjective critique."""
-    issues: list[str] = []
-    if len(playlist.tracks) != 10:
-        issues.append("Playlist must contain exactly 10 tracks")
-    artist_counts = Counter(track.artist.strip().lower() for track in playlist.tracks)
-    if any(count > 2 for count in artist_counts.values()):
-        issues.append("Artist diversity violation: no artist may appear more than twice")
-    genre_counts = Counter(track.genre.strip().lower() for track in playlist.tracks)
-    if any(count > 4 for count in genre_counts.values()):
-        issues.append("Genre diversity violation: no genre may exceed four tracks")
-    if mood_analysis:
-        import re
-        match = re.fullmatch(r"(\d+)\s*-\s*(\d+)", mood_analysis.bpm_range.strip())
-        if match:
-            low, high = int(match.group(1)), int(match.group(2))
-            if any(track.bpm is not None and not low <= track.bpm <= high for track in playlist.tracks):
-                issues.append(f"BPM violation: tracks must stay within {mood_analysis.bpm_range}")
-    return issues
-
-
 def _route_after_critique(state: AgentState) -> str:
     critique = state.get("critique")
     if critique and critique.score < ACCEPT_SCORE and state["refinement_attempts"] < MAX_REFINEMENTS:
@@ -221,6 +200,9 @@ def _increment_attempts(state: AgentState) -> AgentState:
 def _finalise(state: AgentState) -> AgentState:
     playlist = state["playlist"]
     assert playlist is not None
+    hard_issues = _validate_playlist(playlist, state["mood_analysis"])
+    if hard_issues:
+        raise RuntimeError(f"Playlist still violates hard rules after refinement: {'; '.join(hard_issues)}")
     if state["spotify_enrich"]:
         enriched = enrich_tracks_with_spotify([t.model_dump() for t in playlist.tracks])
         playlist.tracks = [Track(**t) for t in enriched]

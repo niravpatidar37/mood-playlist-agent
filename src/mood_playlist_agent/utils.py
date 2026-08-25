@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import requests
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,7 @@ class HuggingFaceChatModel:
         self.temperature = temperature
         self.requested_output = HF_REQUESTED_OUTPUT
 
+    @traceable(name="huggingface.chat", run_type="llm")
     def invoke(self, messages: list[Any]) -> Any:
         token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
         if not token:
