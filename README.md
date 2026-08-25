@@ -154,7 +154,7 @@ Select generation mode from the sidebar: **Fast** / **Deep** / **Agentic (LangGr
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/YOUR_USERNAME/vibeforge.git
+git clone https://github.com/niravpatidar37/mood-playlist-agent.git
 cd vibeforge
 uv sync
 
@@ -250,7 +250,14 @@ Hosted inference keeps model weights out of the application image. A future loca
 
 ```bash
 # Unit tests — no API key needed
-uv run pytest tests/test_models.py -v
+uv run pytest -q
+
+# Frontend checks
+cd vibeforge-ui
+npm ci
+npm run lint
+npm run build
+cd ..
 
 # Live integration tests — requires GROQ_API_KEY
 uv run pytest tests/ -v
