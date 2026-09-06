@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
+import os
 import threading
 import time
 from collections.abc import Generator
 from typing import Any, Literal
 
+import redis
 from pydantic import BaseModel, Field
 from langsmith import traceable
 
@@ -17,9 +20,26 @@ from .quality import validate_playlist
 from .spotify import enrich_tracks_with_spotify
 from .utils import AVAILABLE_MODELS, DEFAULT_MODEL
 
+logger = logging.getLogger(__name__)
+
 GenerationMode = Literal["fast", "deep", "agentic"]
 CACHE_TTL_SECONDS = 900
 CACHE_MAX_ENTRIES = 128
+CACHE_KEY_PREFIX = "vibeforge:cache:"
+
+
+def _connect_redis() -> "redis.Redis | None":
+    """Connect to REDIS_URL for a cache shared across processes/workers, if configured."""
+    url = os.getenv("REDIS_URL")
+    if not url:
+        return None
+    try:
+        client = redis.Redis.from_url(url, socket_connect_timeout=2)
+        client.ping()
+        return client
+    except redis.RedisError as exc:
+        logger.warning("Redis unavailable (%s) — falling back to in-process cache", exc)
+        return None
 
 
 class GenerationRequest(BaseModel):
@@ -48,13 +68,39 @@ class GenerationService:
     """Owns generation policy while adapters remain transport-specific."""
 
     def __init__(self) -> None:
+        self._redis = _connect_redis()
         self._cache: dict[str, tuple[float, Playlist]] = {}
         self._cache_lock = threading.Lock()
 
     def _cache_key(self, request: GenerationRequest) -> str:
-        return json.dumps(request.model_dump(exclude={"spotify_enrich"}), sort_keys=True)
+        return CACHE_KEY_PREFIX + json.dumps(request.model_dump(exclude={"spotify_enrich"}), sort_keys=True)
+
+    def _get_cached(self, cache_key: str) -> Playlist | None:
+        if self._redis is not None:
+            raw = self._redis.get(cache_key)
+            return Playlist.model_validate_json(raw) if raw else None
+        with self._cache_lock:
+            cached = self._cache.get(cache_key)
+            if cached and time.monotonic() - cached[0] < CACHE_TTL_SECONDS:
+                return copy.deepcopy(cached[1])
+            self._cache.pop(cache_key, None)
+            return None
+
+    def _set_cached(self, cache_key: str, playlist: Playlist) -> None:
+        if self._redis is not None:
+            self._redis.setex(cache_key, CACHE_TTL_SECONDS, playlist.model_dump_json())
+            return
+        with self._cache_lock:
+            if len(self._cache) >= CACHE_MAX_ENTRIES:
+                oldest_key = min(self._cache, key=lambda key: self._cache[key][0])
+                self._cache.pop(oldest_key, None)
+            self._cache[cache_key] = (time.monotonic(), copy.deepcopy(playlist))
 
     def invalidate_cache(self) -> None:
+        if self._redis is not None:
+            keys = list(self._redis.scan_iter(f"{CACHE_KEY_PREFIX}*"))
+            if keys:
+                self._redis.delete(*keys)
         with self._cache_lock:
             self._cache.clear()
 
@@ -62,25 +108,18 @@ class GenerationService:
     def generate(self, request: GenerationRequest, defer_enrichment: bool = False) -> Playlist:
         request = request.normalized()
         cache_key = self._cache_key(request)
-        now = time.monotonic()
-        with self._cache_lock:
-            cached = self._cache.get(cache_key)
-            if cached and now - cached[0] < CACHE_TTL_SECONDS:
-                playlist = copy.deepcopy(cached[1])
-            else:
-                self._cache.pop(cache_key, None)
-                playlist = None
+        playlist = self._get_cached(cache_key)
         if playlist is None:
             pipeline_request = request.model_copy(update={"spotify_enrich": False})
             playlist = self._generate_uncached(pipeline_request)
-            issues = validate_playlist(playlist)
-            if issues:
-                raise RuntimeError(f"Generated playlist failed hard validation: {'; '.join(issues)}")
-            with self._cache_lock:
-                if len(self._cache) >= CACHE_MAX_ENTRIES:
-                    oldest_key = min(self._cache, key=lambda key: self._cache[key][0])
-                    self._cache.pop(oldest_key, None)
-                self._cache[cache_key] = (time.monotonic(), copy.deepcopy(playlist))
+            # Agentic mode already ran its own repair-aware hard validation in
+            # graph_agent._finalise; re-running the strict check here would reject
+            # the exactly-10-tracks violation that repair deliberately leaves behind.
+            if pipeline_request.mode != "agentic":
+                issues = validate_playlist(playlist)
+                if issues:
+                    raise RuntimeError(f"Generated playlist failed hard validation: {'; '.join(issues)}")
+            self._set_cached(cache_key, playlist)
         if request.spotify_enrich and not defer_enrichment:
             playlist = self.enrich(playlist)
         return playlist

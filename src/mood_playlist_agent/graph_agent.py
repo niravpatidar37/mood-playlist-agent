@@ -20,11 +20,11 @@ from pydantic import BaseModel, Field
 
 from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
-from .memory import get_preference_context, save_session
-from .quality import validate_playlist as _validate_playlist
+from .memory import get_loved_track_keys, get_preference_context, save_session
+from .quality import validate_playlist as _validate_playlist, repair_playlist as _repair_playlist
 from .spotify import enrich_tracks_with_spotify
 from .utils import (
-    PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL,
+    DEFAULT_MODEL, MOOD_ANALYST_PROMPT, MUSIC_CURATOR_PROMPT, OCCASION_NOTE_TEMPLATE,
     get_cached_llm, get_role_llm, invoke_with_retry, clamp_bpm,
 )
 
@@ -58,32 +58,6 @@ class AgentState(TypedDict):
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
-_MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
-Analyse the user's mood/activity input and return ONLY valid JSON — no markdown, no extra text:
-{
-  "primary_emotion": "string",
-  "secondary_emotions": ["string"],
-  "energy_level": "low|medium|high",
-  "bpm_range": "60-80",
-  "recommended_genres": ["string"],
-  "avoid_genres": ["string"],
-  "time_of_day_context": "string",
-  "activity_context": "string",
-  "musical_key_feel": "major|minor|modal",
-  "occasion": "null or a single word/phrase naming the specific life event (birthday, wedding, graduation, etc.) if one is clearly present — otherwise null"
-}"""
-
-_MUSIC_CURATOR_PROMPT = (
-    "You are a world-class DJ and music curator with encyclopaedic knowledge of songs across all genres, eras, and languages.\n"
-    "Given a mood analysis (and optional critic feedback), curate a 10-track playlist.\n"
-    "Return ONLY valid JSON — no markdown, no extra text:\n"
-    + PLAYLIST_JSON_SCHEMA + "\n"
-    "Rules:\n"
-    + PLAYLIST_CURATOR_RULES + "\n"
-    "- Let weather, season, and day of week shape the energy and texture.\n"
-    "- BPM values must fall within the bpm_range from the mood analysis."
-)
-
 _CRITIC_PROMPT = """You are a music playlist quality critic. Evaluate the playlist against these criteria:
 1. Genre diversity — no single genre > 40% of tracks (max 4/10)
 2. Artist diversity — no artist appears more than twice
@@ -116,7 +90,7 @@ def _analyse_mood(state: AgentState) -> AgentState:
     ]))
     mood_analysis = invoke_with_retry(
         llm,
-        [SystemMessage(content=_MOOD_ANALYST_PROMPT), HumanMessage(content=user_msg)],
+        [SystemMessage(content=MOOD_ANALYST_PROMPT), HumanMessage(content=user_msg)],
         MoodAnalysis,
         "Mood Analyst",
     )
@@ -131,12 +105,7 @@ def _curate_playlist(state: AgentState) -> AgentState:
 
     curator_content = f"Mood analysis:\n{mood_analysis.model_dump_json(indent=2)}"
     if mood_analysis.occasion:
-        curator_content += (
-            f"\n\nOCCASION DETECTED: {mood_analysis.occasion.upper()}\n"
-            "At least 2 of your 10 tracks MUST be songs that are culturally synonymous with this occasion — "
-            "chosen because their title, lyrics, or widespread real-world use at such events makes them instantly "
-            "recognisable as belonging to it, not merely because their energy fits."
-        )
+        curator_content += OCCASION_NOTE_TEMPLATE.format(occasion=mood_analysis.occasion.upper())
     critique = state.get("critique")
     if critique and state["refinement_attempts"] > 0:
         curator_content += (
@@ -148,7 +117,7 @@ def _curate_playlist(state: AgentState) -> AgentState:
 
     playlist = invoke_with_retry(
         llm,
-        [SystemMessage(content=_MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_content)],
+        [SystemMessage(content=MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_content)],
         Playlist,
         "Music Curator",
     )
@@ -200,9 +169,18 @@ def _increment_attempts(state: AgentState) -> AgentState:
 def _finalise(state: AgentState) -> AgentState:
     playlist = state["playlist"]
     assert playlist is not None
+    if _validate_playlist(playlist, state["mood_analysis"]):
+        _repair_playlist(playlist, loved_keys=get_loved_track_keys())
     hard_issues = _validate_playlist(playlist, state["mood_analysis"])
+    # Dropping duplicate/overflow tracks always trips the "exactly 10" rule — that's
+    # an expected side-effect of repair, not a real failure, so only hard-fail on
+    # anything the repair couldn't have caused.
+    if len(playlist.tracks) < 10:
+        hard_issues = [i for i in hard_issues if "exactly 10 tracks" not in i]
     if hard_issues:
         raise RuntimeError(f"Playlist still violates hard rules after refinement: {'; '.join(hard_issues)}")
+    if len(playlist.tracks) < 10:
+        logger.warning("Finalising playlist with %d tracks after repairing rule violations", len(playlist.tracks))
     if state["spotify_enrich"]:
         enriched = enrich_tracks_with_spotify([t.model_dump() for t in playlist.tracks])
         playlist.tracks = [Track(**t) for t in enriched]

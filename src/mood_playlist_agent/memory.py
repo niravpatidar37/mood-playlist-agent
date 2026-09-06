@@ -61,6 +61,14 @@ def _compact_sections(sections: list[str], max_chars: int = MAX_PREFERENCE_CHARS
     return "\n\n".join(selected)
 
 
+def get_loved_track_keys() -> frozenset[str]:
+    """Return lowercase "title by artist" keys for tracks the user has marked loved."""
+    with _memory_lock:
+        data = _load()
+    loved: dict[str, int] = data.get("feedback", {}).get("loved", {})
+    return frozenset(key.lower() for key in loved)
+
+
 def get_preference_context() -> str:
     """Return a blended memory context: favorites to revisit + recent tracks to skip."""
     with _memory_lock:

@@ -13,7 +13,6 @@
 flowchart LR
   Browser[React UI] -->|HTTP / SSE| API[FastAPI adapter]
   CLI[Typer CLI] --> Service[Generation service]
-  Streamlit[Streamlit adapter] --> Service
   API --> Service
   Service --> Agents[Fast / Deep / Agentic]
   Agents --> Context[Context + memory]
@@ -47,7 +46,7 @@ flowchart TB
 | Boundary | Responsibility | Reliability rule |
 |---|---|---|
 | API adapter | Authentication, rate limits, request/response schemas, correlation IDs | Never contain pipeline selection logic |
-| Generation service | Validate input, select mode, define the use-case contract | No HTTP, Streamlit, or CLI imports |
+| Generation service | Validate input, select mode, define the use-case contract | No HTTP or CLI imports |
 | LangGraph workflow | Mood analysis, curation, critique, refinement | Bounded retries and explicit terminal state |
 | Provider adapters | Groq, Spotify, weather | Timeouts, retry budgets, circuit breaking, redacted errors |
 | Repository layer | Sessions, feedback, job state | Atomic writes locally; transactional writes in production |

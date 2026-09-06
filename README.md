@@ -47,7 +47,7 @@ $ vibeforge --mood "late night lo-fi study session" --agentic
 | **Context-aware** | Factors in time of day and live weather |
 | **Session memory** | Learns your genre preferences and skips recently heard tracks |
 | **Multi-language** | Bollywood, K-pop, Latin, Afrobeats, and more |
-| **Web UI** | React and Streamlit interfaces with per-track feedback |
+| **Web UI** | React interface with per-track feedback |
 | **Three generation modes** | Fast · Deep (two-stage) · Agentic (LangGraph + self-correction) |
 | **Modern React workspace** | Responsive listening-room interface with live agent progress |
 | **Multi-provider models** | Groq by default, plus hosted Hugging Face Inference Providers |
@@ -142,16 +142,7 @@ npm run dev
 # → opens http://localhost:5173
 ```
 
-The React UI supports Fast, Deep, and Agentic generation, live LangGraph progress, Hugging Face model selection, Spotify enrichment, and per-track feedback. Agentic progress is streamed over SSE; the playlist is enriched once according to the selected Spotify setting.
-
-### Streamlit interface
-
-```bash
-uv run streamlit run streamlit_app.py
-# → opens http://localhost:8501
-```
-
-Select generation mode from the sidebar: **Fast** / **Deep** / **Agentic (LangGraph + Critic)**. Per-track feedback is saved to `~/.vibeforge/memory.json`, invalidates the local generation cache, and shapes future playlists.
+The React UI supports Fast, Deep, and Agentic generation, live LangGraph progress, Hugging Face model selection, Spotify enrichment, and per-track feedback. Agentic progress is streamed over SSE; the playlist is enriched once according to the selected Spotify setting. Per-track feedback is saved to `~/.vibeforge/memory.json`, invalidates the local generation cache, and shapes future playlists.
 
 ---
 
@@ -297,7 +288,6 @@ vibeforge/
 ├── tests/
 │   ├── test_models.py     # Unit tests (no key needed)
 │   └── test_examples.py   # Live integration tests (skipped without key)
-├── streamlit_app.py       # Web UI (Fast / Deep / Agentic mode selector)
 ├── api.py                 # FastAPI HTTP + SSE adapter
 ├── docs/system-design.md  # Current and production-target architecture
 ├── docs/ui-preview.png    # React UI preview

@@ -13,33 +13,7 @@ from .models import MoodAnalysis, Playlist, Track
 from .context import build_context_string
 from .memory import get_preference_context, save_session
 from .spotify import enrich_tracks_with_spotify
-from .utils import PLAYLIST_JSON_SCHEMA, PLAYLIST_CURATOR_RULES, DEFAULT_MODEL, get_cached_llm, invoke_with_retry, clamp_bpm
-
-_MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
-Analyse the user's mood/activity input and return ONLY valid JSON matching this schema — no markdown, no extra text:
-{
-  "primary_emotion": "string",
-  "secondary_emotions": ["string"],
-  "energy_level": "low|medium|high",
-  "bpm_range": "60-80",
-  "recommended_genres": ["string"],
-  "avoid_genres": ["string"],
-  "time_of_day_context": "string",
-  "activity_context": "string",
-  "musical_key_feel": "major|minor|modal",
-  "occasion": "null or a single word/phrase naming the specific life event (birthday, wedding, graduation, etc.) if one is clearly present — otherwise null"
-}"""
-
-_MUSIC_CURATOR_PROMPT = (
-    "You are a world-class DJ and music curator with encyclopaedic knowledge of songs across all genres, eras, and languages.\n"
-    "Given a mood analysis, curate a 10-track playlist.\n"
-    "Return ONLY valid JSON — no markdown, no extra text:\n"
-    + PLAYLIST_JSON_SCHEMA + "\n"
-    "Rules:\n"
-    + PLAYLIST_CURATOR_RULES + "\n"
-    "- Let weather, season, and day of week shape the energy and texture.\n"
-    "- BPM values must fall within the bpm_range from the mood analysis."
-)
+from .utils import DEFAULT_MODEL, MOOD_ANALYST_PROMPT, MUSIC_CURATOR_PROMPT, OCCASION_NOTE_TEMPLATE, get_cached_llm, invoke_with_retry, clamp_bpm
 
 
 def generate_playlist_with_crew(
@@ -62,7 +36,7 @@ def generate_playlist_with_crew(
     ]))
     mood_analysis = invoke_with_retry(
         llm,
-        [SystemMessage(content=_MOOD_ANALYST_PROMPT), HumanMessage(content=analyst_user)],
+        [SystemMessage(content=MOOD_ANALYST_PROMPT), HumanMessage(content=analyst_user)],
         MoodAnalysis,
         "Mood Analyst",
     )
@@ -70,15 +44,10 @@ def generate_playlist_with_crew(
     # ── Stage 2: Music Curator ───────────────────────────────────────────────
     curator_user = f"Mood analysis:\n{mood_analysis.model_dump_json(indent=2)}"
     if mood_analysis.occasion:
-        curator_user += (
-            f"\n\nOCCASION DETECTED: {mood_analysis.occasion.upper()}\n"
-            "At least 2 of your 10 tracks MUST be songs that are culturally synonymous with this occasion — "
-            "chosen because their title, lyrics, or widespread real-world use at such events makes them instantly "
-            "recognisable as belonging to it, not merely because their energy fits."
-        )
+        curator_user += OCCASION_NOTE_TEMPLATE.format(occasion=mood_analysis.occasion.upper())
     playlist = invoke_with_retry(
         llm,
-        [SystemMessage(content=_MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_user)],
+        [SystemMessage(content=MUSIC_CURATOR_PROMPT), HumanMessage(content=curator_user)],
         Playlist,
         "Music Curator",
     )

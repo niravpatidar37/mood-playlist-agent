@@ -68,6 +68,39 @@ _PLAYLIST_SCHEMA_DICT = {
 }
 PLAYLIST_JSON_SCHEMA = json.dumps(_PLAYLIST_SCHEMA_DICT, indent=2)
 
+MOOD_ANALYST_PROMPT = """You are a music psychologist and emotion expert.
+Analyse the user's mood/activity input and return ONLY valid JSON — no markdown, no extra text:
+{
+  "primary_emotion": "string",
+  "secondary_emotions": ["string"],
+  "energy_level": "low|medium|high",
+  "bpm_range": "60-80",
+  "recommended_genres": ["string"],
+  "avoid_genres": ["string"],
+  "time_of_day_context": "string",
+  "activity_context": "string",
+  "musical_key_feel": "major|minor|modal",
+  "occasion": "null or a single word/phrase naming the specific life event (birthday, wedding, graduation, etc.) if one is clearly present — otherwise null"
+}"""
+
+MUSIC_CURATOR_PROMPT = (
+    "You are a world-class DJ and music curator with encyclopaedic knowledge of songs across all genres, eras, and languages.\n"
+    "Given a mood analysis (and optional critic feedback), curate a 10-track playlist.\n"
+    "Return ONLY valid JSON — no markdown, no extra text:\n"
+    + PLAYLIST_JSON_SCHEMA + "\n"
+    "Rules:\n"
+    + PLAYLIST_CURATOR_RULES + "\n"
+    "- Let weather, season, and day of week shape the energy and texture.\n"
+    "- BPM values must fall within the bpm_range from the mood analysis."
+)
+
+OCCASION_NOTE_TEMPLATE = (
+    "\n\nOCCASION DETECTED: {occasion}\n"
+    "At least 2 of your 10 tracks MUST be songs that are culturally synonymous with this occasion — "
+    "chosen because their title, lyrics, or widespread real-world use at such events makes them instantly "
+    "recognisable as belonging to it, not merely because their energy fits."
+)
+
 
 @lru_cache(maxsize=16)
 def get_cached_llm(model: str, temperature: float = 0.8) -> Any:

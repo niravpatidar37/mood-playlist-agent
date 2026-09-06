@@ -103,6 +103,35 @@ def test_generation_service_rejects_invalid_generated_playlist(monkeypatch):
         service.generate(GenerationRequest(mood="focus", spotify_enrich=False))
 
 
+def test_generation_service_accepts_repaired_agentic_playlist_under_ten_tracks(monkeypatch):
+    from mood_playlist_agent.application import GenerationService
+    from mood_playlist_agent.quality import repair_playlist
+    from tests.test_models import make_playlist, make_track
+
+    playlist = make_playlist()
+    for i, t in enumerate(playlist.tracks):
+        t.genre = f"Genre {i}"
+    playlist.tracks[-1] = make_track(title="Song 0", artist="Artist 0", genre="Genre 9")  # duplicate
+    repair_playlist(playlist)
+    assert len(playlist.tracks) == 9  # repair already dropped the duplicate before this point
+
+    service = GenerationService()
+    monkeypatch.setattr(service, "_generate_uncached", lambda _request: playlist)
+
+    result = service.generate(GenerationRequest(mood="focus", mode="agentic", spotify_enrich=False))
+
+    assert len(result.tracks) == 9
+
+
+def test_generation_service_falls_back_to_in_process_cache_when_redis_unreachable(monkeypatch):
+    from mood_playlist_agent.application import GenerationService
+
+    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1")  # nothing listens here
+    service = GenerationService()
+
+    assert service._redis is None  # connection failed, fell back cleanly
+
+
 def test_generation_service_invalidate_cache_forgets_cached_playlist(monkeypatch):
     from mood_playlist_agent.application import GenerationService
     from tests.test_models import make_playlist

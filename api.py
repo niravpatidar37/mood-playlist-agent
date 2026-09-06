@@ -93,13 +93,9 @@ class FeedbackTrack(BaseModel):
     artist: str = Field(min_length=1, max_length=200)
 
 
-def _empty_feedback_tracks() -> list[FeedbackTrack]:
-    return []
-
-
 class FeedbackRequest(BaseModel):
-    loved: list[FeedbackTrack] = Field(default_factory=_empty_feedback_tracks, max_length=200)
-    disliked: list[FeedbackTrack] = Field(default_factory=_empty_feedback_tracks, max_length=200)
+    loved: list[FeedbackTrack] = Field(default_factory=list[FeedbackTrack], max_length=200)
+    disliked: list[FeedbackTrack] = Field(default_factory=list[FeedbackTrack], max_length=200)
 
 
 @app.post("/feedback")

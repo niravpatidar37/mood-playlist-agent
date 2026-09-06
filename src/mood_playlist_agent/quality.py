@@ -32,6 +32,39 @@ def validate_playlist(playlist: Playlist, mood_analysis: MoodAnalysis | None = N
     return issues
 
 
+def repair_playlist(playlist: Playlist, loved_keys: frozenset[str] = frozenset()) -> None:
+    """Drop duplicate tracks and trim artist/genre overflow in place, mirroring clamp_bpm.
+
+    When a cap forces a choice between tracks, tracks the user has marked "loved"
+    (see memory.get_loved_track_keys) are kept over ones they haven't rated.
+    """
+    def track_key(track: Any) -> str:
+        return f"{track.title.strip().lower()} by {track.artist.strip().lower()}"
+
+    evaluation_order = sorted(
+        range(len(playlist.tracks)),
+        key=lambda i: track_key(playlist.tracks[i]) not in loved_keys,
+    )
+
+    seen_keys: set[str] = set()
+    artist_counts: Counter[str] = Counter()
+    genre_counts: Counter[str] = Counter()
+    keep_indices: set[int] = set()
+    for i in evaluation_order:
+        track = playlist.tracks[i]
+        key = track_key(track)
+        artist = track.artist.strip().lower()
+        genre = track.genre.strip().lower()
+        if key in seen_keys or artist_counts[artist] >= 2 or genre_counts[genre] >= 4:
+            continue
+        seen_keys.add(key)
+        artist_counts[artist] += 1
+        genre_counts[genre] += 1
+        keep_indices.add(i)
+    if len(keep_indices) != len(playlist.tracks):
+        playlist.tracks = [t for i, t in enumerate(playlist.tracks) if i in keep_indices]
+
+
 def playlist_rule_evaluator(inputs: dict[str, Any], outputs: dict[str, Any]) -> dict[str, Any]:
     """LangSmith evaluator for objective playlist constraints."""
     raw_playlist = outputs.get("playlist", outputs)
